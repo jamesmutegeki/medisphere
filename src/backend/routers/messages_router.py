@@ -2,8 +2,9 @@ import json
 import base64
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, or_, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from src.backend.database import get_db
 from src.backend.models import User, Message
@@ -89,14 +90,14 @@ async def get_inbox(
 async def get_conversation(
     user_id: str,
     limit: int = Query(50, ge=1, le=200),
-    before: str = None,
+    before: Optional[str] = None,
     user: User = Depends(_get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Message).where(
-        and_(
-            Message.sender_id.in_([user.id, user_id]),
-            Message.recipient_id.in_([user.id, user_id]),
+        or_(
+            and_(Message.sender_id == user.id, Message.recipient_id == user_id),
+            and_(Message.sender_id == user_id, Message.recipient_id == user.id),
         )
     )
     if before:

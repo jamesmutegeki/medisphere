@@ -1,4 +1,6 @@
+import os
 import hashlib
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,7 +81,7 @@ async def handshake1(req: SRPHandshake1Request, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="User not found")
 
     v = int(user.srp_verifier)
-    b = int.from_bytes(__import__("os").urandom(32), "big") % N_int
+    b = int.from_bytes(os.urandom(32), "big") % N_int
     B = (k_int * v + pow(g, b, N_int)) % N_int
 
     _server_sessions[req.username] = {

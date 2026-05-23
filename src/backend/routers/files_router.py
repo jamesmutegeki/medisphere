@@ -33,9 +33,6 @@ async def upload_file(
         )
 
     file_id = str(uuid.uuid4())
-    file_path = os.path.join(UPLOAD_DIR, file_id)
-    with open(file_path, "wb") as f:
-        f.write(contents)
 
     record = FileRecord(
         id=file_id,

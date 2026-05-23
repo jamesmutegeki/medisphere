@@ -160,15 +160,10 @@ class DoubleRatchet:
     def decrypt(
         self, message: dict, ad: bytes = b""
     ) -> bytes:
-        their_ratchet_key = message["ratchet_key"]
+        rk = message["ratchet_key"]
         message_number = message["message_number"]
         prev_send_count = message.get("prev_send_count", 0)
         ciphertext = message["ciphertext"]
-
-        if isinstance(their_ratchet_key, bytes):
-            rk = their_ratchet_key
-        else:
-            rk = their_ratchet_key
 
         skipped = self._try_skipped_keys(rk, message_number)
         if skipped:
@@ -200,6 +195,10 @@ class DoubleRatchet:
         return self.state.our_ratchet_key.public_bytes()
 
     def serialize_state(self) -> dict:
+        skipped = {}
+        for (rk_bytes, msg_num), msg_key in self.state.skipped_keys.items():
+            key_str = rk_bytes.hex() + ":" + str(msg_num)
+            skipped[key_str] = msg_key.hex()
         return {
             "our_ratchet_private": self.state.our_ratchet_key.private_bytes(),
             "their_ratchet_key": self.state.their_ratchet_key,
@@ -209,10 +208,7 @@ class DoubleRatchet:
             "send_message_number": self.state.send_message_number,
             "recv_message_number": self.state.recv_message_number,
             "prev_send_count": self.state.prev_send_count,
-            "skipped_keys": {
-                k.hex() if isinstance(k, bytes) else str(k): v.hex()
-                for k, v in self.state.skipped_keys.items()
-            },
+            "skipped_keys": skipped,
             "max_skip": self.state.max_skip,
         }
 
@@ -220,6 +216,12 @@ class DoubleRatchet:
     def deserialize_state(
         data: dict, our_ratchet_key: IdentityKeyPair
     ) -> "DoubleRatchet":
+        skipped = {}
+        for key_str, val_hex in data.get("skipped_keys", {}).items():
+            parts = key_str.split(":")
+            rk_bytes = bytes.fromhex(parts[0])
+            msg_num = int(parts[1])
+            skipped[(rk_bytes, msg_num)] = bytes.fromhex(val_hex)
         dr = DoubleRatchet.__new__(DoubleRatchet)
         dr.state = RatchetState(
             our_ratchet_key=our_ratchet_key,
@@ -231,13 +233,7 @@ class DoubleRatchet:
             send_message_number=data.get("send_message_number", 0),
             recv_message_number=data.get("recv_message_number", 0),
             prev_send_count=data.get("prev_send_count", 0),
-            skipped_keys={
-                tuple(
-                    bytes.fromhex(k) if isinstance(k, str) else k
-                    for k in key.split(":")[0]
-                ): bytes.fromhex(v)
-                for key, v in data.get("skipped_keys", {}).items()
-            },
+            skipped_keys=skipped,
             max_skip=data.get("max_skip", MAX_SKIP),
         )
         return dr

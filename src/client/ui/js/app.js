@@ -68,6 +68,7 @@
   const chatAvatar = $('#chat-avatar');
   const chatUsername = $('#chat-username');
   const messagesList = $('#messages-list');
+  const messagesContainer = $('#messages-container');
   const messageInput = $('#message-input');
   const sendBtn = $('#send-btn');
   const typingIndicator = $('#typing-indicator');
@@ -340,9 +341,11 @@
     }
 
     const identityPub = await cc.getPublicKeyBytes(cc.identityKeyPair);
-    const sigInput = Array.from(spkPub).map(b => String.fromCharCode(b)).join('');
-    const sigHash = await sha256(sigInput + api.userId);
-    const signature = new Uint8Array(sigHash.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+    const sigCombined = new Uint8Array(spkPub.length + new TextEncoder().encode(api.userId).length);
+    sigCombined.set(spkPub, 0);
+    sigCombined.set(new TextEncoder().encode(api.userId), spkPub.length);
+    const sigHashRaw = await window.crypto.subtle.digest('SHA-256', sigCombined);
+    const signature = new Uint8Array(sigHashRaw);
 
     const opks = [];
     for (let i = 0; i < 100; i++) {
@@ -649,7 +652,7 @@
           });
         } catch {}
       }
-      messagesList.scrollTop = messagesList.scrollHeight;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     } catch (e) {
       console.error('Load conversation error', e);
     }
@@ -761,7 +764,7 @@
         }));
       }
 
-      messagesList.scrollTop = messagesList.scrollHeight;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     } catch (e) {
       console.error('Send error', e);
       messageInput.value = text;
@@ -798,7 +801,7 @@
       `;
     }
     messagesList.appendChild(div);
-    messagesList.scrollTop = messagesList.scrollHeight;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
   function formatTime(ts) {
@@ -1034,18 +1037,18 @@
   function playNotificationSound() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 800;
-      gain.gain.value = 0.1;
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.08);
-      setTimeout(() => {
-        osc.frequency.value = 1000;
-        gain.gain.value = 0.05;
-      }, 80);
+      const t = ctx.currentTime;
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.connect(gain1); gain1.connect(ctx.destination);
+      osc1.frequency.value = 800; gain1.gain.setValueAtTime(0.1, t);
+      osc1.start(t); osc1.stop(t + 0.1);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2); gain2.connect(ctx.destination);
+      osc2.frequency.value = 1000; gain2.gain.setValueAtTime(0.05, t + 0.1);
+      osc2.start(t + 0.1); osc2.stop(t + 0.2);
     } catch (e) {}
   }
 
@@ -1160,12 +1163,37 @@
       searchIndex = 0;
       searchResults[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+    updateSearchCount();
+  });
+
+  function updateSearchCount() {
+    const countEl = $('#search-count');
+    if (searchResults.length > 0 && searchIndex >= 0) {
+      countEl.textContent = `${searchIndex + 1}/${searchResults.length}`;
+    } else {
+      countEl.textContent = '';
+    }
+  }
+
+  $('#search-prev').addEventListener('click', () => {
+    if (searchResults.length === 0) return;
+    searchIndex = (searchIndex - 1 + searchResults.length) % searchResults.length;
+    searchResults[searchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    updateSearchCount();
+  });
+
+  $('#search-next').addEventListener('click', () => {
+    if (searchResults.length === 0) return;
+    searchIndex = (searchIndex + 1) % searchResults.length;
+    searchResults[searchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    updateSearchCount();
   });
 
   function clearSearchHighlights() {
     messagesList.querySelectorAll('.chat-search-highlight').forEach(m => m.classList.remove('chat-search-highlight'));
     searchResults = [];
     searchIndex = -1;
+    $('#search-count').textContent = '';
   }
 
   // Last Seen

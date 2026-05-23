@@ -4,7 +4,6 @@ class CryptoClient {
     this.signedPreKey = null;
     this.sessions = new Map();
     this.pendingSessions = new Map();
-    this.srpK = null;
   }
 
   async generateIdentityKey() {

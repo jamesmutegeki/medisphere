@@ -88,6 +88,4 @@ class UserResponse(BaseModel):
     created_at: str
 
 
-class VerificationRequest(BaseModel):
-    user_id: str
-    fingerprint: str
+
