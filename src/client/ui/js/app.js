@@ -206,23 +206,26 @@
       );
       const u = BigInt('0x' + uArr);
 
-      const xArr2 = await sha256(
-        Array.from(new Uint8Array(salt.match(/.{1,2}/g).map(b => parseInt(b, 16))))
-          .map(b => String.fromCharCode(b)).join('') +
-        username + ':' + password
-      );
-      const x = BigInt('0x' + xArr2);
+      const saltBytes = new Uint8Array(salt.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+      const upBytes2 = new TextEncoder().encode(username + ':' + password);
+      const xCombined = new Uint8Array(saltBytes.length + upBytes2.length);
+      xCombined.set(saltBytes, 0);
+      xCombined.set(upBytes2, saltBytes.length);
+      const xArr2 = await window.crypto.subtle.digest('SHA-256', xCombined);
+      const x = BigInt('0x' + Array.from(new Uint8Array(xArr2)).map(b => b.toString(16).padStart(2, '0')).join(''));
       const B = BigInt('0x' + Array.from(B_bytes).map(b => b.toString(16).padStart(2, '0')).join(''));
       const S = modPow((B - k * modPow(g, x, N)) % N, (a + u * x) % N, N);
 
-      await sha256(Array.from(bigIntToBytes(S, 384)).map(b => String.fromCharCode(b)).join(''));
+      const S_bytes = bigIntToBytes(S, 384);
+      const K_raw = await window.crypto.subtle.digest('SHA-256', S_bytes);
+      const K = new Uint8Array(K_raw);
 
-      const M1Arr = await sha256(
-        Array.from(A_bytes).map(b => String.fromCharCode(b)).join('') +
-        Array.from(B_bytes).map(b => String.fromCharCode(b)).join('') +
-        ''
-      );
-      const M1 = new Uint8Array(M1Arr.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+      const m1Combined = new Uint8Array(A_bytes.length + B_bytes.length + K.length);
+      m1Combined.set(A_bytes, 0);
+      m1Combined.set(B_bytes, A_bytes.length);
+      m1Combined.set(K, A_bytes.length + B_bytes.length);
+      const M1_hash = await window.crypto.subtle.digest('SHA-256', m1Combined);
+      const M1 = new Uint8Array(M1_hash);
 
       const h2 = await api.srpHandshake2(username, A_bytes, M1);
       api.token = h2.token;
@@ -1183,6 +1186,18 @@
     }
     return origHandleNewMsg(data);
   };
+
+  // Password visibility toggle
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pw-toggle');
+    if (!btn) return;
+    const input = document.getElementById(btn.dataset.target);
+    if (!input) return;
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    btn.querySelector('.eye-open').classList.toggle('hidden', !isPassword);
+    btn.querySelector('.eye-closed').classList.toggle('hidden', isPassword);
+  });
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {

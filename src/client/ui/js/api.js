@@ -23,15 +23,12 @@ class ApiClient {
   }
 
   async register(username, password) {
-    const enc = new TextEncoder();
     const salt = crypto.getRandomValues(new Uint8Array(32));
-    const xArr = await crypto.subtle.digest(
-      'SHA-256',
-      new TextEncoder().encode(
-        Array.from(salt).map(b => String.fromCharCode(b)).join('') +
-        username + ':' + password
-      )
-    );
+    const upBytes = new TextEncoder().encode(username + ':' + password);
+    const combined = new Uint8Array(salt.length + upBytes.length);
+    combined.set(salt, 0);
+    combined.set(upBytes, salt.length);
+    const xArr = await crypto.subtle.digest('SHA-256', combined);
     const x = new Uint8Array(xArr);
     const v = BigInt('0x' + Array.from(x).map(b => b.toString(16).padStart(2, '0')).join(''));
 
