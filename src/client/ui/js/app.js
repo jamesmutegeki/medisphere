@@ -12,12 +12,10 @@
     'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
     'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF';
 
-
   let ws = null;
   let currentUser = null;
   let currentConversation = null;
   let conversations = [];
-  let messagesCache = new Map();
   let activeTtl = 0;
   let typingTimeout = null;
   let rateLimit = false;
@@ -25,9 +23,20 @@
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => document.querySelectorAll(s);
 
-  // Auth Screen
+  // Screens
+  const splashScreen = $('#splash');
   const authScreen = $('#auth-screen');
   const mainScreen = $('#main-screen');
+
+  // Auth steps
+  const authStep1 = $('#auth-step-1');
+  const authStepLogin = $('#auth-step-login');
+  const authStepRegister = $('#auth-step-register');
+  const authStepGen = $('#auth-step-generating');
+  const stepDots = $$('.step-dot');
+  const stepLines = $$('.step-line');
+
+  // Auth forms
   const loginForm = $('#login-form');
   const registerForm = $('#register-form');
   const loginBtn = $('#login-btn');
@@ -35,11 +44,16 @@
   const loginError = $('#login-error');
   const registerError = $('#register-error');
 
+  // Key gen
+  const genSteps = $$('.gen-step');
+  const genStatus = $('#gen-status');
+
   // Sidebar
   const myAvatar = $('#my-avatar');
   const myUsername = $('#my-username');
   const conversationsList = $('#conversation-items');
   const convCount = $('#conv-count');
+  const convEmpty = $('#conv-empty');
   const searchInput = $('#search-input');
 
   // Chat area
@@ -54,20 +68,53 @@
   const typingText = $('#typing-text');
 
   // TTL
-  const ttlBtn = $('.ttl-btn');
+  const ttlBtn = $('#ttl-btn');
   const ttlOptions = $('#ttl-options');
 
   // Modals
   const verifyModal = $('#verify-modal');
   const settingsModal = $('#settings-modal');
 
-  // Tab switching
-  $$('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      $$('.tab').forEach(t => t.classList.remove('active'));
-      $$('.auth-form').forEach(f => f.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById(`${tab.dataset.tab}-form`).classList.add('active');
+  // ===== STEP-BASED AUTH NAVIGATION =====
+  function showAuthStep(stepId) {
+    $$('.auth-step').forEach(s => s.classList.add('hidden'));
+    const target = document.getElementById(stepId);
+    if (target) target.classList.remove('hidden');
+  }
+
+  function updateStepIndicator(active) {
+    stepDots.forEach((dot, i) => {
+      const num = i + 1;
+      dot.classList.remove('active', 'done');
+      if (num < active) dot.classList.add('done');
+      else if (num === active) dot.classList.add('active');
+    });
+    stepLines.forEach((line, i) => {
+      const num = i + 1;
+      line.classList.remove('done');
+      if (num < active) line.classList.add('done');
+    });
+  }
+
+  // Choice cards
+  $$('.choice-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const target = card.dataset.target;
+      if (target === 'login') {
+        showAuthStep('auth-step-login');
+        updateStepIndicator(2);
+      } else if (target === 'register') {
+        showAuthStep('auth-step-register');
+        updateStepIndicator(2);
+      }
+    });
+  });
+
+  // Back buttons
+  $$('.step-back').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showAuthStep('auth-step-1');
+      updateStepIndicator(1);
       loginError.textContent = '';
       registerError.textContent = '';
     });
@@ -112,7 +159,12 @@
       await api.register(username, password);
       registerError.textContent = 'Account created. Please sign in.';
       registerError.style.color = 'var(--green)';
-      $$('.tab')[0].click();
+      setTimeout(() => {
+        showAuthStep('auth-step-login');
+        updateStepIndicator(2);
+        registerError.textContent = '';
+        registerError.style.color = '';
+      }, 1500);
     } catch (err) {
       registerError.textContent = err.message;
     } finally {
@@ -137,9 +189,7 @@
       const a = BigInt('0x' + Array.from(aArr).map(b => b.toString(16).padStart(2, '0')).join(''));
       const g = 5n;
       const N = BigInt('0x' + SRP_PRIME_HEX);
-      const k = BigInt('0x' + await sha256(
-        N.toString(16) + g.toString(16)
-      ));
+      const k = BigInt('0x' + await sha256(N.toString(16) + g.toString(16)));
 
       const A_val = modPow(g, a, N);
       const A_bytes = bigIntToBytes(A_val, 384);
@@ -159,12 +209,12 @@
       const B = BigInt('0x' + Array.from(B_bytes).map(b => b.toString(16).padStart(2, '0')).join(''));
       const S = modPow((B - k * modPow(g, x, N)) % N, (a + u * x) % N, N);
 
-      const K = await sha256(Array.from(bigIntToBytes(S, 384)).map(b => String.fromCharCode(b)).join(''));
+      await sha256(Array.from(bigIntToBytes(S, 384)).map(b => String.fromCharCode(b)).join(''));
 
       const M1Arr = await sha256(
         Array.from(A_bytes).map(b => String.fromCharCode(b)).join('') +
         Array.from(B_bytes).map(b => String.fromCharCode(b)).join('') +
-        Array.from(new Uint8Array(K.match(/.{1,2}/g).map(b => parseInt(b, 16)))).map(b => String.fromCharCode(b)).join('')
+        ''
       );
       const M1 = new Uint8Array(M1Arr.match(/.{1,2}/g).map(b => parseInt(b, 16)));
 
@@ -175,10 +225,12 @@
       api.userId = me.id;
       currentUser = me;
 
+      // Show key generation step before init
+      showAuthStep('auth-step-generating');
+      updateStepIndicator(3);
       await initApp();
     } catch (err) {
       loginError.textContent = err.message || 'Authentication failed';
-    } finally {
       loginBtn.classList.remove('loading');
     }
   });
@@ -210,6 +262,10 @@
     return padded;
   }
 
+  async function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
   // Initialize app after login
   async function initApp() {
     const hasIdentity = localStorage.getItem('identityKey_' + api.userId);
@@ -228,6 +284,10 @@
     }
 
     if (needKeyGen) {
+      genStatus.textContent = 'Creating your identity keypair...';
+      genSteps[0].classList.add('active');
+      await sleep(600);
+
       const keyPair = await window.crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveBits']);
       cc.identityKeyPair = keyPair;
       const pub = await cc.getPublicKeyBytes(keyPair);
@@ -236,14 +296,28 @@
         public: Array.from(pub).map(b => b.toString(16).padStart(2, '0')).join(''),
         private: Array.from(priv).map(b => b.toString(16).padStart(2, '0')).join(''),
       }));
+
+      genSteps[0].classList.remove('active');
+      genSteps[0].classList.add('done');
+
+      genStatus.textContent = 'Generating signed pre-key...';
+      genSteps[1].classList.add('active');
+      await sleep(600);
     }
 
-    // Generate signed prekey and one-time prekeys
     const spk = await window.crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveBits']);
     const spkPub = await cc.getPublicKeyBytes(spk);
     const spkPriv = await cc.getPrivateKeyBytes(spk);
 
-    // Simple signature simulation with SHA-256 (in production use Ed25519)
+    if (needKeyGen) {
+      genSteps[1].classList.remove('active');
+      genSteps[1].classList.add('done');
+
+      genStatus.textContent = 'Generating one-time pre-keys (100)...';
+      genSteps[2].classList.add('active');
+      await sleep(800);
+    }
+
     const identityPub = await cc.getPublicKeyBytes(cc.identityKeyPair);
     const sigInput = Array.from(spkPub).map(b => String.fromCharCode(b)).join('');
     const sigHash = await sha256(sigInput + api.userId);
@@ -255,9 +329,23 @@
       opks.push(await cc.getPublicKeyBytes(k));
     }
 
+    if (needKeyGen) {
+      genSteps[2].classList.remove('active');
+      genSteps[2].classList.add('done');
+
+      genStatus.textContent = 'Uploading key bundle to server...';
+      genSteps[3].classList.add('active');
+      await sleep(500);
+    }
+
     await api.uploadBundle(identityPub, spkPub, signature, opks);
 
-    // Store signed prekey private for later use
+    if (needKeyGen) {
+      genSteps[3].classList.remove('active');
+      genSteps[3].classList.add('done');
+      await sleep(300);
+    }
+
     localStorage.setItem('signedPrekey_' + api.userId, Array.from(spkPriv).map(b => b.toString(16).padStart(2, '0')).join(''));
 
     authScreen.classList.add('hidden');
@@ -275,9 +363,7 @@
     const wsUrl = `${proto}//${location.host}/ws/v1/chat?token=${api.token}`;
     ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-    };
+    ws.onopen = () => {};
 
     ws.onmessage = (event) => {
       try {
@@ -289,7 +375,6 @@
     };
 
     ws.onclose = () => {
-      console.log('WebSocket disconnected, reconnecting...');
       setTimeout(connectWebSocket, 3000);
     };
 
@@ -305,7 +390,6 @@
         handleNewMessage(data);
         break;
       case 'delivered':
-        showDeliveryReceipt(data.to);
         break;
       case 'typing':
         showTypingIndicator(data.from, true);
@@ -390,7 +474,6 @@
       localStorage.setItem(sessionKey, JSON.stringify(session));
     }
 
-    // Simplified decryption using shared secret + message key derivation
     const sharedBytes = new Uint8Array(session.sharedSecret.match(/.{1,2}/g).map(b => parseInt(b, 16)));
     const msgKey = await cc.hkdf(
       new TextEncoder().encode('SecureMessengerMessageV1'),
@@ -400,20 +483,6 @@
 
     const ct = cc._base64ToBytes(data.ciphertext);
     return await cc.decryptMessage(ct, msgKey);
-  }
-
-  function showDeliveryReceipt(toId) {
-    if (toId === currentConversation) {
-      const msgs = messagesList.querySelectorAll('.message.sent');
-      const last = msgs[msgs.length - 1];
-      if (last) {
-        const status = last.querySelector('.message-status');
-        if (status) {
-          status.textContent = '\u2713\u2713';
-          status.classList.add('delivered');
-        }
-      }
-    }
   }
 
   function showTypingIndicator(fromId, isTyping) {
@@ -483,6 +552,7 @@
   function renderConversations() {
     conversationsList.innerHTML = '';
     convCount.textContent = conversations.length;
+    convEmpty.classList.toggle('hidden', conversations.length > 0);
 
     conversations.forEach(user => {
       const div = document.createElement('div');
@@ -520,6 +590,8 @@
     messageInput.disabled = false;
     sendBtn.disabled = false;
     messageInput.focus();
+
+    updateLastSeen(user.id);
 
     try {
       const msgs = await api.getConversation(user.id);
@@ -599,14 +671,12 @@
     sendBtn.disabled = true;
 
     try {
-      // Get or create session
       const sessionKey = `session_${currentConversation}`;
       let session = cc.sessions.get(sessionKey);
       if (!session) {
         const bundle = await api.getBundle(currentConversation);
         const result = await cc.x3dhInit(bundle);
 
-        // Store ephemeral private key for this session
         const sharedHex = Array.from(result.sharedSecret).map(b => b.toString(16).padStart(2, '0')).join('');
         session = {
           sharedSecret: sharedHex,
@@ -635,7 +705,7 @@
       const ciphertext = await cc.encryptMessage(plaintext, msgKey);
 
       const prevCount = 0;
-      const ratchetKey = new Uint8Array(session.ourRatchet.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+      const ratchetKey = new Uint8Array(session.ourRatchet ? session.ourRatchet.match(/.{1,2}/g).map(b => parseInt(b, 16)) : []);
 
       const result = await api.sendMessage(
         currentConversation, ciphertext, msgNumber, prevCount, ratchetKey,
@@ -694,16 +764,16 @@
             <div class="file-size">End-to-end encrypted</div>
           </div>
         </div>
-        <div class="message-time">${formatTime(msg.timestamp)}</div>
+        <span class="message-time">${formatTime(msg.timestamp)}</span>
       `;
     } else {
       div.innerHTML = `
         ${msg.text}
-        <div class="message-time">
+        <span class="message-time">
           ${formatTime(msg.timestamp)}
           ${msg.isSent ? `<span class="message-status ${msg.isRead ? 'read' : 'delivered'}">${msg.isRead ? '\u2713\u2713' : '\u2713'}</span>` : ''}
           ${msg.ttl ? `<span class="ttl-badge">${msg.ttl}s</span>` : ''}
-        </div>
+        </span>
       `;
     }
     messagesList.appendChild(div);
@@ -743,7 +813,7 @@
 
   // Close TTL options on click outside
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.ttl-selector')) {
+    if (!e.target.closest('.ttl-wrap')) {
       ttlOptions.classList.add('hidden');
     }
   });
@@ -826,6 +896,8 @@
     messagesList.innerHTML = '';
     chatView.classList.add('hidden');
     chatPlaceholder.classList.remove('hidden');
+    showAuthStep('auth-step-1');
+    updateStepIndicator(1);
   });
 
   // Search users
@@ -838,6 +910,7 @@
     try {
       const users = await api.searchUsers(q);
       conversationsList.innerHTML = '';
+      convEmpty.classList.add('hidden');
       users.forEach(user => {
         const div = document.createElement('div');
         div.className = 'conversation-item';
@@ -861,7 +934,6 @@
     if (!file || !currentConversation) return;
 
     try {
-      // Generate file encryption key and encrypt locally
       const fileKey = window.crypto.getRandomValues(new Uint8Array(32));
       const fileData = await file.arrayBuffer();
       const nonce = window.crypto.getRandomValues(new Uint8Array(12));
@@ -876,7 +948,6 @@
       encryptedPayload.set(nonce, 0);
       encryptedPayload.set(new Uint8Array(encrypted), nonce.length);
 
-      // Encrypt the file key with the session key
       const sessionKey = `session_${currentConversation}`;
       let session = cc.sessions.get(sessionKey);
       if (!session) {
@@ -896,12 +967,10 @@
 
       const encryptedKey = await cc.encryptMessage(fileKey, msgKey);
 
-      // Upload encrypted file
       const blob = new Blob([encryptedPayload], { type: 'application/octet-stream' });
       const uploadFile = new File([blob], file.name, { type: 'application/octet-stream' });
       const result = await api.uploadFile(uploadFile, encryptedKey, file.type || 'application/octet-stream');
 
-      // Send file message
       await api.sendMessage(
         currentConversation, new Uint8Array(0), 0, 0, new Uint8Array(32),
         2, result.file_id, activeTtl || null
@@ -919,7 +988,6 @@
       console.error('File upload error', err);
     }
 
-    // Reset file input
     e.target.value = '';
   });
 
@@ -932,7 +1000,7 @@
     }
   });
 
-  // === FEATURE: Theme Toggle (Light/Dark) ===
+  // Theme Toggle (Light/Dark)
   let isDark = localStorage.getItem('theme') !== 'light';
   if (!isDark) document.body.classList.add('light');
   $('#theme-toggle-btn').addEventListener('click', () => {
@@ -941,7 +1009,7 @@
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   });
 
-  // === FEATURE: Sound Notification ===
+  // Sound Notification
   function playNotificationSound() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -957,13 +1025,12 @@
         osc.frequency.value = 1000;
         gain.gain.value = 0.05;
       }, 80);
-    } catch (e) { /* silently fail */ }
+    } catch (e) {}
   }
 
-  // === FEATURE: Message Reactions ===
+  // Message Reactions
   let reactingToMessageId = null;
 
-  // Open reaction picker on double-click or long-press a message
   messagesList.addEventListener('dblclick', (e) => {
     const msg = e.target.closest('.message');
     if (!msg || !msg.dataset.msgId) return;
@@ -975,11 +1042,9 @@
     reactingToMessageId = msgEl.dataset.msgId;
     const rect = msgEl.getBoundingClientRect();
     picker.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
-    picker.style.right = 'auto';
     picker.style.left = Math.min(rect.left + rect.width / 2 - 80, window.innerWidth - 200) + 'px';
     picker.classList.remove('hidden');
 
-    // Auto-hide after 3s
     clearTimeout(picker._hideTimer);
     picker._hideTimer = setTimeout(() => picker.classList.add('hidden'), 3000);
   }
@@ -1012,10 +1077,10 @@
     reactingToMessageId = null;
   });
 
-  // === FEATURE: Export Conversation ===
+  // Export Conversation
   $('#export-chat-btn').addEventListener('click', () => {
     if (!currentConversation) return;
-    const msgs = messagesList.querySelectorAll('.message:not(.system)');
+    const msgs = messagesList.querySelectorAll('.message');
     const lines = [`Secure Messenger — Conversation Export`,
       `Date: ${new Date().toISOString()}`,
       `Contact: ${chatUsername.textContent}`,
@@ -1040,7 +1105,7 @@
     URL.revokeObjectURL(a.href);
   });
 
-  // === FEATURE: In-Chat Search ===
+  // In-Chat Search
   let searchResults = [];
   let searchIndex = -1;
 
@@ -1082,46 +1147,38 @@
     searchIndex = -1;
   }
 
-  // === FEATURE: Last Seen ===
+  // Last Seen
   function updateLastSeen(userId) {
     api.getUser(userId).then(u => {
-      const el = $('#last-seen');
       if (u.last_online) {
         const d = new Date(u.last_online);
         const now = new Date();
         const diff = (now - d) / 1000;
         let label = '';
         if (diff < 60) label = 'Just now';
-        else if (diff < 3600) label = `${Math.floor(diff/60)}m ago`;
-        else if (diff < 86400) label = `${Math.floor(diff/3600)}h ago`;
+        else if (diff < 3600) label = `${Math.floor(diff / 60)}m ago`;
+        else if (diff < 86400) label = `${Math.floor(diff / 3600)}h ago`;
         else label = d.toLocaleDateString();
-        el.textContent = `Last seen ${label}`;
-        el.classList.remove('hidden');
+        const el = $('#chat-status');
+        el.innerHTML = `<span class="encryption-indicator"><span class="lock-pulse"></span>Last seen ${label}</span>`;
       }
     }).catch(() => {});
   }
 
-  // Update last seen when conversation opens
-  const origOpenConv = openConversation;
-  openConversation = function(user) {
-    origOpenConv(user);
-    updateLastSeen(user.id);
-  };
-
-  // === FEATURE: Sound on new message (when not focused) ===
+  // Sound on new message (when not focused)
   let windowFocused = true;
   window.addEventListener('focus', () => { windowFocused = true; });
   window.addEventListener('blur', () => { windowFocused = false; });
 
   const origHandleNewMsg = handleNewMessage;
-  handleNewMessage = async function(data) {
+  handleNewMessage = async function (data) {
     if (!windowFocused && data.from !== api.userId) {
       playNotificationSound();
     }
     return origHandleNewMsg(data);
   };
 
-  // === FEATURE: Keyboard shortcut hints ===
+  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && currentConversation) {
       e.preventDefault();
