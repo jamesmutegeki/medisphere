@@ -47,3 +47,10 @@ build/
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# Environment
+.env
+
+# Source PDF (design doc, not code)
+*.pdf
+
