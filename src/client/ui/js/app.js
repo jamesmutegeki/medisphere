@@ -10,7 +10,7 @@
     'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
     'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
     'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
-    'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF';
+    'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF';
 
   let ws = null;
   let currentUser = null;
@@ -196,7 +196,7 @@
       const a = BigInt('0x' + Array.from(aArr).map(b => b.toString(16).padStart(2, '0')).join(''));
       const g = 5n;
       const N = BigInt('0x' + SRP_PRIME_HEX);
-      const N_bytes_len = 256;
+      const N_bytes_len = SRP_PRIME_HEX.length / 2;
 
       // k = SHA-256(N_bytes || 0x05) → matches server
       const N_bytes = bigIntToBytes(N, N_bytes_len);

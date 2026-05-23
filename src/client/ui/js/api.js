@@ -29,8 +29,20 @@ class ApiClient {
     combined.set(salt, 0);
     combined.set(upBytes, salt.length);
     const xArr = await crypto.subtle.digest('SHA-256', combined);
-    const x = new Uint8Array(xArr);
-    const v = BigInt('0x' + Array.from(x).map(b => b.toString(16).padStart(2, '0')).join(''));
+    const x = BigInt('0x' + Array.from(new Uint8Array(xArr)).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+    const SRP_PRIME_HEX =
+      'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
+      'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
+      'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
+      'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
+      'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
+      'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
+      'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF' +
+      'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF';
+    const g = 5n;
+    const N = BigInt('0x' + SRP_PRIME_HEX);
+    const v = this._modPow(g, x, N);
 
     const body = {
       username,
@@ -39,6 +51,18 @@ class ApiClient {
       identity_key: '',
     };
     return this.request('POST', '/auth/register', body);
+  }
+
+  _modPow(base, exp, mod) {
+    if (mod === 1n) return 0n;
+    let result = 1n;
+    base = base % mod;
+    while (exp > 0n) {
+      if (exp % 2n === 1n) result = (result * base) % mod;
+      exp = exp >> 1n;
+      base = (base * base) % mod;
+    }
+    return result;
   }
 
   async srpHandshake1(username) {
