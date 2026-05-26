@@ -452,7 +452,12 @@ def dashboard():
         return redirect(url_for('admin_dashboard'))
     cursor = mysql.connection.cursor()
     try:
-        cursor.execute('SELECT u.*, tb.balance as yocoin_balance FROM users u JOIN token_balances tb ON u.user_id = tb.address WHERE u.user_id = %s',(session['user_id'],))
+        cursor.execute('''
+            SELECT u.*,
+                COALESCE((SELECT SUM(amount) FROM loans WHERE user_id = u.user_id AND status = 'disbursed'), 0) -
+                COALESCE((SELECT SUM(amount) FROM loan_repayments WHERE user_id = u.user_id), 0) as yocoin_balance
+            FROM users u WHERE u.user_id = %s
+        ''', (session['user_id'],))
         user = cursor.fetchone()
         cursor.execute('SELECT * FROM loans WHERE user_id = %s ORDER BY application_date DESC LIMIT 5', (session['user_id'],))
         loans = cursor.fetchall()
@@ -1096,9 +1101,10 @@ def admin_users():
         total_users = cursor.fetchone()['cnt']
 
         cursor.execute('''
-            SELECT u.*, COALESCE(tb.balance, 0) as yocoin_balance
+            SELECT u.*,
+                COALESCE((SELECT SUM(amount) FROM loans WHERE user_id = u.user_id AND status = 'disbursed'), 0) -
+                COALESCE((SELECT SUM(amount) FROM loan_repayments WHERE user_id = u.user_id), 0) as yocoin_balance
             FROM users u
-            LEFT JOIN token_balances tb ON u.user_id = tb.address
             ORDER BY u.registration_date DESC LIMIT %s OFFSET %s
         ''', (per_page, offset))
         users = cursor.fetchall()
