@@ -211,9 +211,7 @@ class RepaymentForm(FlaskForm):
     ])
     payment_method = SelectField("Payment Method", validators=[DataRequired()],
         choices=[("mobile_money", "Mobile Money (MTN/Airtel)"), ("bank", "Bank Transfer"), ("cash", "Cash Payment")])
-    payment_provider = SelectField("Provider", validators=[Optional()],
-        choices=[("", "Select provider..."), ("mtn", "MTN Mobile Money"), ("airtel", "Airtel Money"),
-                 ("centenary", "Centenary Bank"), ("stanbic", "Stanbic Bank"), ("equity", "Equity Bank")])
+    account_number = StringField('Account / Phone', validators=[Optional(), Length(max=50)])
     transaction_reference = StringField('Transaction Reference', validators=[Optional(), Length(max=100)])
     submit = SubmitField("Make Payment")
 
@@ -631,7 +629,7 @@ def repayment():
                 return redirect(url_for("repayment"))
 
             try:
-                provider = form.payment_provider.data or ''
+                account = form.account_number.data or ''
                 payment_method_label = dict(form.payment_method.choices).get(form.payment_method.data, form.payment_method.data)
                 use_api = request.form.get('use_api', 'false').lower() == 'true'
 
@@ -647,18 +645,18 @@ def repayment():
                         form.loan_id.data)
                     flash(f'Cash payment reference: {cash_reference}. Show this to the admin.', 'info')
 
-                if use_api and form.payment_method.data == 'mobile_money' and provider in ('mtn', 'airtel'):
+                if use_api and form.payment_method.data == 'mobile_money':
                     cursor.execute('SELECT phone FROM users WHERE user_id = %s', (session['user_id'],))
                     user_phone = cursor.fetchone()
                     success, txn_id, message, prov = mobile_money.collect_payment(
-                        payment_amount, user_phone['phone'], provider, form.loan_id.data, session['user_id']
+                        payment_amount, user_phone['phone'], 'auto', form.loan_id.data, session['user_id']
                     )
                     if not success:
                         flash(f'Mobile Money API: {message}. Try manual payment.', 'warning')
                         return redirect(url_for("repayment"))
                     flash(f'Payment request sent via {prov.upper()}. Check your phone. Ref: {txn_id[:12]}', 'info')
 
-                stored_method = provider if provider else form.payment_method.data
+                stored_method = account if account else form.payment_method.data
 
                 repayment_id = generate_user_id()
                 cursor.execute("""

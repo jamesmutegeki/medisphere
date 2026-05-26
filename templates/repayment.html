@@ -30,9 +30,10 @@
 {{ form.payment_method(class='form-select fc', id='paymentMethod', onchange='toggleProvider()') }}
 </div>
 
-<div class='mb-4' id='providerGroup'>
-<label class='form-label' id='providerLabel'>Provider</label>
-{{ form.payment_provider(class='form-select fc', id='paymentProvider') }}
+<div class='mb-4' id='accountGroup' style='display:none'>
+<label class='form-label' id='accountLabel'>Phone Number</label>
+{{ form.account_number(class='form-control fc', id='accountNumber', placeholder='Enter phone number') }}
+<div class='form-text' id='accountHelp'>Enter the phone number for mobile money payment</div>
 </div>
 
 <div class='card p-3 mb-4' id='paymentInstructions' style='background:var(--g1);border:none;'>
@@ -53,51 +54,38 @@
 
 {% block scripts %}
 <script>
-var providerChoices = {
-    'mobile_money': [
-        {value: '', text: 'Select mobile money provider...'},
-        {value: 'mtn', text: 'MTN Mobile Money'},
-        {value: 'airtel', text: 'Airtel Money'}
-    ],
-    'bank': [
-        {value: '', text: 'Select bank...'},
-        {value: 'centenary', text: 'Centenary Bank'},
-        {value: 'stanbic', text: 'Stanbic Bank'},
-        {value: 'equity', text: 'Equity Bank'}
-    ]
-};
-
 var instructions = {
-    'mobile_money': 'Send your payment via Mobile Money to <strong>+256 700 000 000</strong> (YoCoin Official Account). Use your Loan ID as reference.',
-    'bank': 'Transfer to <strong>YoCoin Account</strong> — Centenary Bank: <strong>1001234567</strong>, Stanbic Bank: <strong>9030001234567</strong>, Equity Bank: <strong>1200100012345</strong>. Use Loan ID as reference.',
+    'mobile_money': 'Send your payment via Mobile Money. Enter the phone number you will pay from below.',
+    'bank': 'Transfer to <strong>YoCoin Account</strong> — Centenary Bank: <strong>1001234567</strong>, Stanbic Bank: <strong>9030001234567</strong>, Equity Bank: <strong>1200100012345</strong>. Enter your account number below.',
     'cash': 'Visit any YoCoin agent or office to make a cash payment. A payment reference will be generated for you.'
 };
 
 function toggleProvider() {
     var method = document.getElementById('paymentMethod').value;
-    var providerGroup = document.getElementById('providerGroup');
-    var providerSelect = document.getElementById('paymentProvider');
-    var label = document.getElementById('providerLabel');
+    var accountGroup = document.getElementById('accountGroup');
+    var accountInput = document.getElementById('accountNumber');
+    var label = document.getElementById('accountLabel');
+    var help = document.getElementById('accountHelp');
     var instr = document.getElementById('instructionsText');
 
     if (method === 'cash') {
-        providerGroup.style.display = 'none';
-        providerSelect.value = '';
+        accountGroup.style.display = 'none';
+        accountInput.value = '';
         instr.innerHTML = instructions['cash'];
-    } else if (method === 'mobile_money' || method === 'bank') {
-        providerGroup.style.display = 'block';
-        var choices = providerChoices[method] || [];
-        providerSelect.innerHTML = '';
-        choices.forEach(function(c) {
-            var opt = document.createElement('option');
-            opt.value = c.value;
-            opt.text = c.text;
-            providerSelect.appendChild(opt);
-        });
-        label.textContent = method === 'mobile_money' ? 'Mobile Money Provider' : 'Select Bank';
-        instr.innerHTML = instructions[method];
+    } else if (method === 'mobile_money') {
+        accountGroup.style.display = 'block';
+        label.textContent = 'Phone Number';
+        accountInput.placeholder = 'Enter phone number (e.g. 2567XXXXXXXX)';
+        help.textContent = 'Enter the phone number you will send mobile money from';
+        instr.innerHTML = instructions['mobile_money'];
+    } else if (method === 'bank') {
+        accountGroup.style.display = 'block';
+        label.textContent = 'Account Number';
+        accountInput.placeholder = 'Enter your bank account number';
+        help.textContent = 'Enter the bank account number you will transfer from';
+        instr.innerHTML = instructions['bank'];
     } else {
-        providerGroup.style.display = 'none';
+        accountGroup.style.display = 'none';
         instr.innerHTML = 'Select a payment method to see instructions.';
     }
 }
