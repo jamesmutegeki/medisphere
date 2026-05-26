@@ -59,8 +59,9 @@ main.container { max-width: 100% !important; padding-left: 24px; padding-right: 
 <th>Email</th>
 <th>Phone</th>
 <th>Region</th>
-<th>Credit Score</th>
-<th>KYC Status</th>
+                <th>Balance</th>
+                <th>Credit Score</th>
+                <th>KYC Status</th>
 <th>Registered</th>
 <th>Actions</th>
 </tr>
@@ -83,12 +84,15 @@ main.container { max-width: 100% !important; padding-left: 24px; padding-right: 
 <td>{{ u.email }}</td>
 <td>{{ u.phone }}</td>
 <td>{{ u.region }}</td>
-<td>
-<span class='badge bg-{{ "success" if u.credit_score > 700 else "warning" if u.credit_score > 600 else "danger" }}'>{{ u.credit_score }}</span>
-</td>
-<td>
-<span class='badge bg-{{ "success" if u.kyc_status == "verified" else "warning" if u.kyc_status == "in_progress" else "secondary" }}'>{{ u.kyc_status.replace('_', ' ').title() }}</span>
-</td>
+                    <td>
+                        <span class='badge bg-info'>UGX {{ "{:,.0f}".format(u.yocoin_balance) }}</span>
+                    </td>
+                    <td>
+                        <span class='badge bg-{{ "success" if u.credit_score > 700 else "warning" if u.credit_score > 600 else "danger" }}'>{{ u.credit_score }}</span>
+                    </td>
+                    <td>
+                        <span class='badge bg-{{ "success" if u.kyc_status == "verified" else "warning" if u.kyc_status == "in_progress" else "secondary" }}'>{{ u.kyc_status.replace('_', ' ').title() }}</span>
+                    </td>
 <td><small>{{ u.registration_date.strftime('%Y-%m-%d') if u.registration_date else 'N/A' }}</small></td>
 <td><a href='{{ url_for("admin_user_detail", user_id=u.user_id) }}' class='btn btn-sm btn-outline-primary'>View</a></td>
 </tr>

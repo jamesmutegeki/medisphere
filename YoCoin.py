@@ -1095,7 +1095,12 @@ def admin_users():
         cursor.execute('SELECT COUNT(*) as cnt FROM users')
         total_users = cursor.fetchone()['cnt']
 
-        cursor.execute('SELECT * FROM users ORDER BY registration_date DESC LIMIT %s OFFSET %s', (per_page, offset))
+        cursor.execute('''
+            SELECT u.*, COALESCE(tb.balance, 0) as yocoin_balance
+            FROM users u
+            LEFT JOIN token_balances tb ON u.user_id = tb.address
+            ORDER BY u.registration_date DESC LIMIT %s OFFSET %s
+        ''', (per_page, offset))
         users = cursor.fetchall()
     finally:
         cursor.close()
