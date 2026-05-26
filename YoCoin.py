@@ -626,7 +626,7 @@ def repayment():
             except (ValueError, AttributeError):
                 flash("Invalid payment amount", "danger")
                 return redirect(url_for("repayment"))
-            if payment_amount > selected_loan["balance"]:
+            if payment_amount > float(selected_loan["balance"]):
                 flash("Payment exceeds remaining balance", "warning")
                 return redirect(url_for("repayment"))
             if payment_amount < 1000:
@@ -671,7 +671,7 @@ def repayment():
 
                 cursor.execute('UPDATE token_balances SET balance = balance - %s WHERE address = %s',
                               (payment_amount, session["user_id"]))
-                new_balance = selected_loan["balance"] - payment_amount
+                new_balance = float(selected_loan["balance"]) - payment_amount
                 was_on_time = selected_loan.get('due_date') is None or datetime.now() <= selected_loan['due_date']
                 days_early = max(0, (selected_loan['due_date'] - datetime.now()).days) if selected_loan.get('due_date') else 0
 
