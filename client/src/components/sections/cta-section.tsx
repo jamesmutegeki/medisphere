@@ -4,9 +4,9 @@ import Button from "../ui/button";
 
 export default function CTASection() {
   return (
-    <section className="py-16 lg:py-24 bg-navy-50 dark:bg-neutral-900/30">
+    <section className="py-16 lg:py-24 bg-neutral-50 dark:bg-neutral-900/30">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h2 className="font-serif text-3xl lg:text-4xl font-bold text-navy-800 dark:text-white mb-4">
+        <h2 className="font-serif text-3xl lg:text-4xl font-bold text-black dark:text-white mb-4">
           Ready to Work with Us?
         </h2>
         <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-8 max-w-2xl mx-auto">

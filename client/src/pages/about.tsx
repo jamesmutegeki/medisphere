@@ -12,9 +12,9 @@ const values = [
 export default function About() {
   return (
     <>
-      <section className="bg-navy-900 py-20 lg:py-28">
+      <section className="bg-neutral-900 py-20 lg:py-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="text-sm font-medium text-gold-400 uppercase tracking-wider">About Our Firm</span>
+          <span className="text-sm font-medium text-neutral-400 uppercase tracking-wider">About Our Firm</span>
           <h1 className="font-serif text-4xl lg:text-5xl font-bold text-white mt-4 mb-6">
             A Legacy of Legal Excellence
           </h1>
@@ -28,7 +28,7 @@ export default function About() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div>
-              <h2 className="font-serif text-3xl font-bold text-navy-800 dark:text-white mb-6">Our Story</h2>
+              <h2 className="font-serif text-3xl font-bold text-black dark:text-white mb-6">Our Story</h2>
               <div className="space-y-4 text-neutral-600 dark:text-neutral-400 leading-relaxed">
                 <p>Founded in 2005 by James Mutegeki, CCP Digest began as a small practice with a vision to provide world-class corporate legal services in East Africa. Today, we are one of the region&#39;s most respected corporate and commercial law firms.</p>
                 <p>Our team of 20+ attorneys brings together diverse expertise across multiple practice areas, serving clients ranging from emerging startups to Fortune 500 companies operating in the region.</p>
@@ -50,16 +50,16 @@ export default function About() {
       <section className="py-16 lg:py-24 bg-neutral-50 dark:bg-neutral-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="font-serif text-3xl font-bold text-navy-800 dark:text-white mb-4">Our Core Values</h2>
+            <h2 className="font-serif text-3xl font-bold text-black dark:text-white mb-4">Our Core Values</h2>
             <p className="text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">The principles that guide every aspect of our practice and define who we are.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {values.map((v) => (
               <div key={v.title} className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-6 hover:shadow-md transition-all">
-                <div className="w-12 h-12 rounded-lg bg-navy-100 dark:bg-navy-800 flex items-center justify-center mb-4">
-                  <v.icon size={24} className="text-navy-700 dark:text-navy-300" />
+                <div className="w-12 h-12 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
+                  <v.icon size={24} className="text-neutral-700 dark:text-neutral-300" />
                 </div>
-                <h3 className="font-semibold text-navy-800 dark:text-white mb-2">{v.title}</h3>
+                <h3 className="font-semibold text-black dark:text-white mb-2">{v.title}</h3>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">{v.desc}</p>
               </div>
             ))}

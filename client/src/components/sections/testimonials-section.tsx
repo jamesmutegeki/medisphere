@@ -10,12 +10,12 @@ export default function TestimonialsSection() {
   const prev = () => setCurrent((c) => (c - 1 + t.length) % t.length);
 
   return (
-    <section className="py-16 lg:py-24 bg-gradient-to-br from-navy-800 to-navy-900 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-96 h-96 bg-gold-400/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gold-400/5 rounded-full blur-3xl" />
+    <section className="py-16 lg:py-24 bg-neutral-900 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
 
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <Quote size={48} className="text-gold-400/30 mx-auto mb-6" />
+        <Quote size={48} className="text-white/20 mx-auto mb-6" />
         <h2 className="font-serif text-3xl lg:text-4xl font-bold text-white mb-12">
           What Our Clients Say
         </h2>
@@ -34,10 +34,10 @@ export default function TestimonialsSection() {
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="w-14 h-14 rounded-full object-cover mx-auto mb-3 ring-2 ring-gold-400/50"
+                    className="w-14 h-14 rounded-full object-cover mx-auto mb-3 ring-2 ring-white/30"
                   />
                   <div className="font-semibold text-white">{item.name}</div>
-                  <div className="text-sm text-gold-400">{item.company}</div>
+                  <div className="text-sm text-neutral-400">{item.company}</div>
                 </div>
               ))}
             </div>
@@ -57,7 +57,7 @@ export default function TestimonialsSection() {
                   key={i}
                   onClick={() => setCurrent(i)}
                   className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    i === current ? "bg-gold-400 w-6" : "bg-white/30"
+                    i === current ? "bg-white w-6" : "bg-white/30"
                   }`}
                   aria-label={`Go to testimonial ${i + 1}`}
                 />

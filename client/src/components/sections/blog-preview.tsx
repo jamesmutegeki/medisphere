@@ -11,8 +11,8 @@ export default function BlogPreview() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
           <div>
-            <span className="text-sm font-medium text-gold-600 dark:text-gold-400 uppercase tracking-wider">Insights</span>
-            <h2 className="font-serif text-3xl lg:text-4xl font-bold text-navy-800 dark:text-white mt-3">
+            <span className="text-sm font-medium text-neutral-500 uppercase tracking-wider">Insights</span>
+            <h2 className="font-serif text-3xl lg:text-4xl font-bold text-black dark:text-white mt-3">
               Latest Legal Insights
             </h2>
           </div>
@@ -38,8 +38,8 @@ export default function BlogPreview() {
                 />
               </div>
               <div className="p-5">
-                <Badge variant="gold">{post.category}</Badge>
-                <h3 className="font-semibold text-navy-800 dark:text-white mt-3 mb-2 group-hover:text-navy-600 dark:group-hover:text-gold-400 transition-colors line-clamp-2">
+                <Badge>{post.category}</Badge>
+                <h3 className="font-semibold text-black dark:text-white mt-3 mb-2 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors line-clamp-2">
                   {post.title}
                 </h3>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2 mb-4">
@@ -50,7 +50,7 @@ export default function BlogPreview() {
                     <Calendar size={12} />
                     {new Date(post.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
                   </div>
-                  <span className="text-sm font-medium text-navy-700 dark:text-gold-400 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+                  <span className="text-sm font-medium text-black dark:text-white inline-flex items-center gap-1 group-hover:gap-2 transition-all">
                     Read <ArrowRight size={14} />
                   </span>
                 </div>
