@@ -1,0 +1,16 @@
+export { default as SymptomChecker } from './symptom-checker';
+export { default as PharmacologicTreatment } from './pharmacologic-treatment';
+export { default as AskADoctor } from './ask-a-doctor';
+export { default as Stethoscope } from './stethoscope';
+export { default as FemalePatient } from './female-patient';
+export { default as ChildPatient } from './child-patient';
+export { default as MalePatient } from './male-patient';
+export { default as FamilyMedicine } from './family-medicine';
+export { default as Mhealth } from './mhealth';
+export { default as Cardiogram } from './cardiogram';
+export { default as MedicalSupervision } from './medical-supervision';
+export { default as WaitingRoom } from './waiting-room';
+export { default as OnlineMedicalServices } from './online-medical-services';
+export { default as HeartCare } from './heart-care';
+export { default as MedicalNews } from './medical-news';
+export { default as Ehealth } from './ehealth';
