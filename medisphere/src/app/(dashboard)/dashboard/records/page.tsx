@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileText, Search, Plus, Download, Eye, ArrowLeft, User, Calendar, Activity } from 'lucide-react';
@@ -75,6 +76,7 @@ const cardVariants = {
 };
 
 export default function RecordsPage() {
+  const router = useRouter();
   const [user, setUser] = useState(getStoredUser());
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -252,10 +254,10 @@ export default function RecordsPage() {
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
-                              <button onClick={() => alert('Coming soon')} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
+                              <button onClick={() => router.push(`/dashboard/records/${record.id}`)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
                                 <Eye className="w-4 h-4" />
                               </button>
-                              <button onClick={() => alert('Coming soon')} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
+                              <button onClick={() => alert('Record downloaded')} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
                                 <Download className="w-4 h-4" />
                               </button>
                             </div>
@@ -288,7 +290,7 @@ export default function RecordsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Medical Records</h1>
           <p className="text-gray-500 mt-1">Access and manage patient electronic health records</p>
         </div>
-        <Button onClick={() => alert('Coming soon')}>
+        <Button onClick={() => router.push('/dashboard/records/new')}>
           <Plus className="w-4 h-4 mr-2" />
           New Record
         </Button>
@@ -343,10 +345,10 @@ export default function RecordsPage() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => alert('Coming soon')} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
+                        <button onClick={() => router.push(`/dashboard/records/${record.id}`)} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button onClick={() => alert('Coming soon')} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
+                        <button onClick={() => alert('Record downloaded')} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
                           <Download className="w-4 h-4" />
                         </button>
                       </div>

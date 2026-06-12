@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Pill, Plus, Search, Clock, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -16,6 +17,7 @@ const prescriptions = [
 ];
 
 export default function PrescriptionsPage() {
+  const router = useRouter();
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -23,7 +25,7 @@ export default function PrescriptionsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Prescriptions</h1>
           <p className="text-gray-500 mt-1">Create and manage e-prescriptions</p>
         </div>
-        <Button onClick={() => alert('Coming soon')}>
+        <Button onClick={() => router.push('/dashboard/prescriptions/new')}>
           <Plus className="w-4 h-4 mr-2" />
           New Prescription
         </Button>

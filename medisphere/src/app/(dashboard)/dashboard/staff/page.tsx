@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Users, Calendar, Clock, Plus } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -53,6 +54,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function StaffRotaPage() {
+  const router = useRouter();
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -60,7 +62,7 @@ export default function StaffRotaPage() {
           <h1 className="text-2xl font-bold text-gray-900">Staff Rota Management</h1>
           <p className="text-gray-500 mt-1">Schedule and manage staff shifts across all departments</p>
         </div>
-        <Button onClick={() => alert('Coming soon')}>
+        <Button onClick={() => router.push('/dashboard/staff/new')}>
           <Plus className="w-4 h-4 mr-2" />
           Add Shift
         </Button>

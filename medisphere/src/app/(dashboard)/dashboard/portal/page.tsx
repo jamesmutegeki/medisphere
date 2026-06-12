@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Calendar, FileText, Pill, Receipt, User, Bell, ArrowRight } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -24,6 +25,7 @@ const recentPrescriptions = [
 ];
 
 export default function PatientPortalPage() {
+  const router = useRouter();
   return (
     <div className="space-y-6">
       <div>
@@ -99,7 +101,7 @@ export default function PatientPortalPage() {
                 </motion.div>
               ))}
             </div>
-            <Button variant="outline" className="w-full mt-4" onClick={() => alert('Coming soon')}>
+            <Button variant="outline" className="w-full mt-4" onClick={() => router.push('/dashboard/appointments/new')}>
               <Calendar className="w-4 h-4 mr-2" />
               Book New Appointment
             </Button>
@@ -134,7 +136,7 @@ export default function PatientPortalPage() {
                 </motion.div>
               ))}
             </div>
-            <Button variant="outline" className="w-full mt-4" onClick={() => alert('Coming soon')}>
+            <Button variant="outline" className="w-full mt-4" onClick={() => router.push('/dashboard/prescriptions/new')}>
               <Pill className="w-4 h-4 mr-2" />
               Request Refill
             </Button>

