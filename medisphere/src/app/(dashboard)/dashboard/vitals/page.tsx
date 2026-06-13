@@ -1,28 +1,86 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, Heart, Thermometer, Wind, Droplets, Weight } from 'lucide-react';
+import { Activity, Heart, Thermometer, Wind, Droplets, Weight, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-const vitalsData = [
-  { label: 'Blood Pressure', value: '120/80', unit: 'mmHg', icon: Activity, color: 'from-blue-500 to-cyan-500', status: 'Normal' },
-  { label: 'Heart Rate', value: '72', unit: 'bpm', icon: Heart, color: 'from-red-500 to-rose-500', status: 'Normal' },
-  { label: 'Temperature', value: '98.6', unit: '°F', icon: Thermometer, color: 'from-orange-500 to-amber-500', status: 'Normal' },
-  { label: 'Respiratory Rate', value: '16', unit: 'breaths/min', icon: Wind, color: 'from-emerald-500 to-teal-500', status: 'Normal' },
-  { label: 'O2 Saturation', value: '98', unit: '%', icon: Droplets, color: 'from-violet-500 to-purple-500', status: 'Normal' },
-  { label: 'Weight', value: '154', unit: 'lbs', icon: Weight, color: 'from-gray-500 to-slate-500', status: '--' },
-];
-
-const vitalsHistory = [
-  { date: 'Jun 10', bp: '118/78', hr: '70', temp: '98.4', rr: '16', spo2: '99' },
-  { date: 'Jun 09', bp: '122/80', hr: '74', temp: '98.6', rr: '18', spo2: '98' },
-  { date: 'Jun 08', bp: '120/82', hr: '72', temp: '98.6', rr: '16', spo2: '98' },
-  { date: 'Jun 07', bp: '116/76', hr: '68', temp: '98.2', rr: '15', spo2: '99' },
-  { date: 'Jun 06', bp: '124/84', hr: '76', temp: '98.8', rr: '18', spo2: '97' },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 export default function VitalsPage() {
+  const [vitalsData, setVitalsData] = useState<any[]>([]);
+  const [vitalsHistory, setVitalsHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ vitals: any[] }>('/api/vitals');
+        if (cancelled) return;
+        const items = data.vitals || [];
+        if (items.length > 0) {
+          const latest = items[items.length - 1];
+          const current = [
+            { label: 'Blood Pressure', value: latest.bloodPressure || latest.bp || '--', unit: 'mmHg', icon: Activity, color: 'from-blue-500 to-cyan-500', status: 'Normal' },
+            { label: 'Heart Rate', value: String(latest.heartRate ?? latest.hr ?? '--'), unit: 'bpm', icon: Heart, color: 'from-red-500 to-rose-500', status: 'Normal' },
+            { label: 'Temperature', value: latest.temperature ?? latest.temp ?? '--', unit: '°F', icon: Thermometer, color: 'from-orange-500 to-amber-500', status: 'Normal' },
+            { label: 'Respiratory Rate', value: String(latest.respiratoryRate ?? latest.rr ?? '--'), unit: 'breaths/min', icon: Wind, color: 'from-emerald-500 to-teal-500', status: 'Normal' },
+            { label: 'O2 Saturation', value: String(latest.oxygenSaturation ?? latest.spo2 ?? '--'), unit: '%', icon: Droplets, color: 'from-violet-500 to-purple-500', status: 'Normal' },
+            { label: 'Weight', value: latest.weight ? String(latest.weight) : '--', unit: 'lbs', icon: Weight, color: 'from-gray-500 to-slate-500', status: '--' },
+          ];
+          setVitalsData(current);
+          setVitalsHistory(items.map((v: any) => ({
+            date: v.date ? new Date(v.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '--',
+            bp: v.bloodPressure || v.bp || '--',
+            hr: String(v.heartRate ?? v.hr ?? '--'),
+            temp: v.temperature ?? v.temp ?? '--',
+            rr: String(v.respiratoryRate ?? v.rr ?? '--'),
+            spo2: String(v.oxygenSaturation ?? v.spo2 ?? '--'),
+          })).reverse());
+        }
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading vitals data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Vitals Tracking</h1>
+          <p className="text-gray-500 mt-1">Monitor and record patient vital signs</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>

@@ -99,6 +99,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [router]);
 
   const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Proceed with local logout even if API call fails
+    }
     clearStoredUser();
     router.push('/login');
   };

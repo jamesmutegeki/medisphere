@@ -1,57 +1,93 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Syringe, Calendar, CheckCircle } from 'lucide-react';
+import { Syringe, Calendar, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const patients = [
-  { id: 'P-1024', name: 'Emily Johnson' },
-  { id: 'P-1025', name: 'Michael Brown' },
-  { id: 'P-1026', name: 'Sarah Wilson' },
-  { id: 'P-1027', name: 'James Davis' },
-  { id: 'P-1028', name: 'Maria Garcia' },
-];
-
-const immunizationRecords: Record<string, {
-  id: string;
-  vaccine: string;
-  dose: string;
-  date: string;
-  nextDose: string;
-  administeredBy: string;
-}[]> = {
-  'P-1024': [
-    { id: 'I-001', vaccine: 'Influenza', dose: 'Annual', date: '2025-10-15', nextDose: '2026-10-15', administeredBy: 'Dr. Sarah Chen' },
-    { id: 'I-002', vaccine: 'COVID-19', dose: 'Booster', date: '2025-09-01', nextDose: '2026-09-01', administeredBy: 'Dr. Sarah Chen' },
-    { id: 'I-003', vaccine: 'Tdap', dose: '1', date: '2024-06-10', nextDose: '2034-06-10', administeredBy: 'Dr. Michael Lee' },
-  ],
-  'P-1025': [
-    { id: 'I-004', vaccine: 'Hepatitis B', dose: '3', date: '2025-12-20', nextDose: 'Completed', administeredBy: 'Dr. Sarah Chen' },
-    { id: 'I-005', vaccine: 'Influenza', dose: 'Annual', date: '2025-11-05', nextDose: '2026-11-05', administeredBy: 'Nurse Amy Park' },
-  ],
-  'P-1026': [
-    { id: 'I-006', vaccine: 'MMR', dose: '2', date: '2024-08-14', nextDose: 'Completed', administeredBy: 'Dr. Sarah Chen' },
-    { id: 'I-007', vaccine: 'Varicella', dose: '2', date: '2024-08-14', nextDose: 'Completed', administeredBy: 'Dr. Sarah Chen' },
-    { id: 'I-008', vaccine: 'HPV', dose: '1', date: '2026-01-10', nextDose: '2026-07-10', administeredBy: 'Dr. Sarah Chen' },
-  ],
-  'P-1027': [
-    { id: 'I-009', vaccine: 'Pneumococcal', dose: '1', date: '2025-06-30', nextDose: '2026-06-30', administeredBy: 'Dr. James Wilson' },
-  ],
-  'P-1028': [
-    { id: 'I-010', vaccine: 'DTaP', dose: '4', date: '2026-03-22', nextDose: '2027-03-22', administeredBy: 'Dr. Sarah Chen' },
-    { id: 'I-011', vaccine: 'IPV', dose: '3', date: '2026-03-22', nextDose: 'Completed', administeredBy: 'Dr. Sarah Chen' },
-    { id: 'I-012', vaccine: 'Hib', dose: '4', date: '2026-03-22', nextDose: 'Completed', administeredBy: 'Dr. Sarah Chen' },
-  ],
-};
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 export default function ImmunizationsPage() {
-  const [selectedPatient, setSelectedPatient] = useState(patients[0].id);
+  const [patients, setPatients] = useState<{ id: string; name: string }[]>([]);
+  const [immunizationRecords, setImmunizationRecords] = useState<Record<string, any[]>>({});
+  const [selectedPatient, setSelectedPatient] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ immunizations: any[] }>('/api/immunizations');
+        if (cancelled) return;
+        const items = data.immunizations || [];
+        const recordsMap: Record<string, any[]> = {};
+        const patientSet: Record<string, string> = {};
+        items.forEach((r: any) => {
+          const pid = r.patientId || r.patient?.id || 'unknown';
+          const pname = r.patient ? `${r.patient.firstName} ${r.patient.lastName}` : 'Unknown';
+          patientSet[pid] = pname;
+          if (!recordsMap[pid]) recordsMap[pid] = [];
+          recordsMap[pid].push({
+            id: r.id,
+            vaccine: r.vaccine || r.vaccineName || '',
+            dose: r.dose || r.doseNumber || '',
+            date: r.date || '',
+            nextDose: r.nextDoseDate || r.nextDose || 'Completed',
+            administeredBy: r.administeredBy || r.administeredBy || '',
+          });
+        });
+        if (!cancelled) {
+          setPatients(Object.entries(patientSet).map(([id, name]) => ({ id, name })));
+          setImmunizationRecords(recordsMap);
+          const firstId = Object.keys(patientSet)[0] || '';
+          setSelectedPatient(firstId);
+        }
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
   const records = immunizationRecords[selectedPatient] || [];
-  const completedCount = records.filter((r) => r.nextDose === 'Completed').length;
-  const upcomingCount = records.filter((r) => r.nextDose !== 'Completed').length;
+  const completedCount = records.filter((r: any) => r.nextDose === 'Completed').length;
+  const upcomingCount = records.filter((r: any) => r.nextDose !== 'Completed').length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading immunization records...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Immunization Records</h1>
+          <p className="text-gray-500 mt-1">Vaccination history and scheduled doses</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

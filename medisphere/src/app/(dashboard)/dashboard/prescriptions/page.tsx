@@ -1,23 +1,76 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Pill, Plus, Search, Clock, AlertCircle } from 'lucide-react';
+import { Pill, Plus, Search, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const prescriptions = [
-  { id: 'P-001', patient: 'Emily Johnson', medication: 'Lisinopril 10mg', dosage: '1 tablet daily', prescribed: '2026-06-10', status: 'Active', refills: 2 },
-  { id: 'P-002', patient: 'Michael Brown', medication: 'Atorvastatin 20mg', dosage: '1 tablet at night', prescribed: '2026-06-09', status: 'Active', refills: 3 },
-  { id: 'P-003', patient: 'Sarah Wilson', medication: 'Metformin 500mg', dosage: '2 tablets daily', prescribed: '2026-06-08', status: 'Active', refills: 1 },
-  { id: 'P-004', patient: 'James Davis', medication: 'Amoxicillin 500mg', dosage: '1 tablet 3x daily', prescribed: '2026-06-07', status: 'Completed', refills: 0 },
-  { id: 'P-005', patient: 'Maria Garcia', medication: 'Albuterol Inhaler', dosage: '2 puffs as needed', prescribed: '2026-06-06', status: 'Active', refills: 2 },
-  { id: 'P-006', patient: 'Robert Kim', medication: 'Ibuprofen 400mg', dosage: '1 tablet as needed', prescribed: '2026-06-05', status: 'Active', refills: 4 },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 export default function PrescriptionsPage() {
   const router = useRouter();
+  const [prescriptions, setPrescriptions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ prescriptions: any[] }>('/api/prescriptions');
+        if (cancelled) return;
+        setPrescriptions((data.prescriptions || []).map((p: any) => ({
+          id: p.id,
+          patient: p.patient ? `${p.patient.firstName} ${p.patient.lastName}` : 'Unknown',
+          medication: p.medication || p.medicationName || '',
+          dosage: p.dosage || '',
+          prescribed: p.prescribedDate || p.date || '',
+          status: p.isActive ? 'Active' : 'Completed',
+          refills: p.refillsRemaining ?? p.refills ?? 0,
+        })));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading prescriptions...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Prescriptions</h1>
+          <p className="text-gray-500 mt-1">Create and manage e-prescriptions</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

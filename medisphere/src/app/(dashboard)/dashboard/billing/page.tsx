@@ -1,21 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Receipt, Plus, Download, Search } from 'lucide-react';
+import { Receipt, Plus, Download, Search, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const invoices = [
-  { id: 'INV-001', patient: 'Emily Johnson', date: '2026-06-10', amount: 350.00, paid: 350.00, status: 'Paid' },
-  { id: 'INV-002', patient: 'Michael Brown', date: '2026-06-09', amount: 520.00, paid: 200.00, status: 'Partial' },
-  { id: 'INV-003', patient: 'Sarah Wilson', date: '2026-06-08', amount: 180.00, paid: 0, status: 'Pending' },
-  { id: 'INV-004', patient: 'James Davis', date: '2026-06-07', amount: 1240.00, paid: 1240.00, status: 'Paid' },
-  { id: 'INV-005', patient: 'Maria Garcia', date: '2026-06-06', amount: 675.00, paid: 0, status: 'Insurance Pending' },
-  { id: 'INV-006', patient: 'Robert Kim', date: '2026-06-05', amount: 290.00, paid: 290.00, status: 'Paid' },
-  { id: 'INV-007', patient: 'Linda Foster', date: '2026-06-04', amount: 880.00, paid: 0, status: 'Overdue' },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 const statusColors: Record<string, string> = {
   'Paid': 'bg-green-50 text-green-700',
@@ -28,9 +21,73 @@ const statusColors: Record<string, string> = {
 
 export default function BillingPage() {
   const router = useRouter();
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ invoices: any[] }>('/api/invoices');
+        if (cancelled) return;
+        setInvoices((data.invoices || []).map((inv: any) => ({
+          id: inv.id,
+          patient: inv.patient ? `${inv.patient.firstName} ${inv.patient.lastName}` : 'Unknown',
+          date: inv.date || '',
+          amount: inv.amount ?? 0,
+          paid: inv.paidAmount ?? inv.paid ?? 0,
+          status: inv.status || 'Pending',
+        })));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
   const totalPending = invoices
     .filter(i => i.status === 'Pending' || i.status === 'Overdue')
     .reduce((sum, i) => sum + (i.amount - i.paid), 0);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading billing data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Billing & Invoicing</h1>
+            <p className="text-gray-500 mt-1">Manage invoices, payments, and billing operations</p>
+          </div>
+          <Button onClick={() => router.push('/dashboard/billing/new')}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Invoice
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

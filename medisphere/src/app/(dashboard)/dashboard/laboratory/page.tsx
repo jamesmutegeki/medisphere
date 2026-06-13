@@ -1,29 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { FlaskConical, Search, Activity } from 'lucide-react';
+import { FlaskConical, Search, Activity, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const testCategories = [
-  { name: 'Blood Work', count: 156, icon: Activity, color: 'from-red-500 to-rose-500' },
-  { name: 'Urinalysis', count: 89, icon: FlaskConical, color: 'from-amber-500 to-yellow-500' },
-  { name: 'Microbiology', count: 45, icon: Activity, color: 'from-emerald-500 to-teal-500' },
-  { name: 'Chemistry', count: 112, icon: FlaskConical, color: 'from-blue-500 to-cyan-500' },
-];
-
-const labResults = [
-  { id: 'LR-001', patient: 'Emily Johnson', test: 'Complete Blood Count', category: 'Blood Work', result: '5.2', range: '4.5-11.0 x10^3/uL', status: 'NORMAL', date: '2026-06-10' },
-  { id: 'LR-002', patient: 'Michael Brown', test: 'Lipid Panel', category: 'Chemistry', result: '240', range: '<200 mg/dL', status: 'ABNORMAL', date: '2026-06-09' },
-  { id: 'LR-003', patient: 'Sarah Wilson', test: 'Urinalysis', category: 'Urinalysis', result: 'Negative', range: 'Negative', status: 'NORMAL', date: '2026-06-08' },
-  { id: 'LR-004', patient: 'James Davis', test: 'Blood Culture', category: 'Microbiology', result: 'Pending', range: 'No growth', status: 'PENDING', date: '2026-06-07' },
-  { id: 'LR-005', patient: 'Maria Garcia', test: 'Basic Metabolic Panel', category: 'Chemistry', result: '98', range: '70-110 mg/dL', status: 'NORMAL', date: '2026-06-06' },
-  { id: 'LR-006', patient: 'Robert Kim', test: 'C-Reactive Protein', category: 'Blood Work', result: '12.5', range: '<3.0 mg/L', status: 'ABNORMAL', date: '2026-06-05' },
-  { id: 'LR-007', patient: 'Amanda Lee', test: 'INR/PT', category: 'Blood Work', result: '2.1', range: '0.8-1.2', status: 'ABNORMAL', date: '2026-06-04' },
-  { id: 'LR-008', patient: 'David Miller', test: 'Urine Culture', category: 'Microbiology', result: 'Pending', range: 'No growth', status: 'PENDING', date: '2026-06-03' },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 const statusColors: Record<string, string> = {
   NORMAL: 'bg-green-50 text-green-700',
@@ -33,10 +17,80 @@ const statusColors: Record<string, string> = {
 
 export default function LaboratoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [labResults, setLabResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ labResults: any[]; results?: any[] }>('/api/lab-results');
+        if (cancelled) return;
+        const items = data.labResults || data.results || [];
+        setLabResults(items.map((r: any) => ({
+          id: r.id,
+          patient: r.patient ? `${r.patient.firstName} ${r.patient.lastName}` : 'Unknown',
+          test: r.testName || r.test || '',
+          category: r.category || '',
+          result: r.result || '',
+          range: r.normalRange || r.range || '',
+          status: r.status || 'PENDING',
+          date: r.date || '',
+        })));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
+  const testCategories = (() => {
+    const counts: Record<string, number> = {};
+    const icons: Record<string, any> = { 'Blood Work': Activity, 'Urinalysis': FlaskConical, 'Microbiology': Activity, 'Chemistry': FlaskConical };
+    const colors: Record<string, string> = { 'Blood Work': 'from-red-500 to-rose-500', 'Urinalysis': 'from-amber-500 to-yellow-500', 'Microbiology': 'from-emerald-500 to-teal-500', 'Chemistry': 'from-blue-500 to-cyan-500' };
+    labResults.forEach(r => { counts[r.category] = (counts[r.category] || 0) + 1; });
+    return Object.entries(counts).map(([name, count]) => ({
+      name, count, icon: icons[name] || Activity, color: colors[name] || 'from-gray-500 to-slate-500',
+    }));
+  })();
 
   const filteredResults = labResults.filter((r) =>
     r.patient.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading lab results...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Lab Results</h1>
+          <p className="text-gray-500 mt-1">View and manage patient laboratory tests</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

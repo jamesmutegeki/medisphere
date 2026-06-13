@@ -100,8 +100,14 @@ model User {
   referralsAsPatient  Referral[]       @relation("PatientReferrals")
   referralsAsReferringDoctor Referral[] @relation("ReferringDoctor")
   referralsAsReferredDoctor Referral[]  @relation("ReferredDoctor")
+  beds                Bed[]
   leaveRequests       LeaveRequest[]   @relation("StaffLeaveRequests")
   approvedLeaves      LeaveRequest[]   @relation("LeaveApprover")
+  availabilities      Availability[]
+  waitlistEntries     WaitlistEntry[]
+  intakesAsPatient    Intake[]         @relation("PatientIntakes")
+  intakesAsChecker    Intake[]         @relation("IntakeCheckers")
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -133,6 +139,7 @@ model DoctorProfile {
   consultationFee Decimal  @default(0)
   availableDays   String?
   availableSlots  String?
+  bio             String?
   isAvailable     Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -264,7 +271,8 @@ model Bed {
   patientId String?
   assignedAt DateTime?
 
-  ward Ward @relation(fields: [wardId], references: [id])
+  ward    Ward   @relation(fields: [wardId], references: [id])
+  patient User?  @relation(fields: [patientId], references: [id])
 
   @@map("beds")
 }
@@ -503,6 +511,61 @@ model InventoryItem {
   @@map("inventory_items")
 }
 
+model Availability {
+  id          String   @id @default(cuid())
+  doctorId    String
+  date        DateTime
+  startTime   DateTime
+  endTime     DateTime
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  doctor User @relation(fields: [doctorId], references: [id])
+
+  @@index([doctorId, date])
+  @@map("availabilities")
+}
+
+model WaitlistEntry {
+  id            String   @id @default(cuid())
+  patientId     String
+  department    String
+  priority      String   @default("NORMAL")
+  estimatedWait Int?
+  checkInTime   DateTime @default(now())
+  status        String   @default("WAITING")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  patient User @relation(fields: [patientId], references: [id])
+
+  @@index([department, status])
+  @@map("waitlist_entries")
+}
+
+model Intake {
+  id                      String   @id @default(cuid())
+  patientId               String
+  chiefComplaint          String
+  bloodPressureSystolic   Int?
+  bloodPressureDiastolic  Int?
+  heartRate               Int?
+  temperature             Decimal?
+  allergies               String[]
+  consent                 Boolean
+  status                  String   @default("CHECKED_IN")
+  checkedInBy             String
+  checkInTime             DateTime @default(now())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  patient        User @relation("PatientIntakes", fields: [patientId], references: [id])
+  checkedInByUser User @relation("IntakeCheckers", fields: [checkedInBy], references: [id])
+
+  @@map("intakes")
+}
+
 model Session {
   id           String   @id @default(cuid())
   userId       String
@@ -511,4 +574,21 @@ model Session {
   createdAt    DateTime @default(now())
 
   @@map("sessions")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  description String?
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
 }

@@ -1,22 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { CalendarDays, Users, CheckCircle, XCircle } from 'lucide-react';
+import { CalendarDays, Users, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const leaveRequests = [
-  { id: 1, staffName: 'Dr. Sarah Chen', type: 'Annual', startDate: '2026-06-15', endDate: '2026-06-19', duration: 5, reason: 'Family vacation', status: 'Pending' },
-  { id: 2, staffName: 'Nurse Amy Chen', type: 'Sick', startDate: '2026-06-12', endDate: '2026-06-13', duration: 2, reason: 'Flu symptoms', status: 'Approved' },
-  { id: 3, staffName: 'Dr. David Kim', type: 'Personal', startDate: '2026-06-14', endDate: '2026-06-14', duration: 1, reason: 'Personal appointment', status: 'Pending' },
-  { id: 4, staffName: 'Nurse Robert Taylor', type: 'Annual', startDate: '2026-06-20', endDate: '2026-06-27', duration: 8, reason: 'Overseas trip', status: 'Approved' },
-  { id: 5, staffName: 'Dr. Lisa Park', type: 'Sick', startDate: '2026-06-10', endDate: '2026-06-11', duration: 2, reason: 'Migraine', status: 'Approved' },
-  { id: 6, staffName: 'Nurse Emily Davis', type: 'Personal', startDate: '2026-06-16', endDate: '2026-06-16', duration: 1, reason: 'Child school event', status: 'Pending' },
-  { id: 7, staffName: 'Dr. James Wilson', type: 'Annual', startDate: '2026-06-22', endDate: '2026-06-26', duration: 5, reason: 'Family reunion', status: 'Pending' },
-  { id: 8, staffName: 'Nurse John Smith', type: 'Sick', startDate: '2026-06-08', endDate: '2026-06-09', duration: 2, reason: 'Stomach bug', status: 'Approved' },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-amber-50 text-amber-700',
@@ -28,14 +18,86 @@ const tabs = ['Pending Requests', 'Approved', 'All'];
 
 const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+function computeDuration(startDate: string, endDate: string): number {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const diff = end.getTime() - start.getTime();
+  return Math.max(1, Math.round(diff / (1000 * 60 * 60 * 24)) + 1);
+}
+
 export default function LeaveManagementPage() {
   const [activeTab, setActiveTab] = useState('Pending Requests');
+  const [leaveRequestsData, setLeaveRequestsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const res = await api.get<any>('/api/leave-requests');
+        if (cancelled) return;
+        const items = Array.isArray(res) ? res : res.leaveRequests ?? res.data ?? [];
+        const mapped = items.map((r: any) => {
+          const firstName = r.user?.firstName ?? '';
+          const lastName = r.user?.lastName ?? '';
+          return {
+            id: r.id,
+            staffName: `${firstName} ${lastName}`.trim() || r.staffName || 'Unknown',
+            type: r.type ?? 'Annual',
+            startDate: r.startDate ? r.startDate.split('T')[0] : '',
+            endDate: r.endDate ? r.endDate.split('T')[0] : '',
+            duration: r.duration ?? computeDuration(r.startDate, r.endDate),
+            reason: r.reason ?? '',
+            status: r.status ?? 'Pending',
+          };
+        });
+        setLeaveRequestsData(mapped);
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = activeTab === 'All'
-    ? leaveRequests
+    ? leaveRequestsData
     : activeTab === 'Approved'
-      ? leaveRequests.filter(l => l.status === 'Approved')
-      : leaveRequests.filter(l => l.status === 'Pending');
+      ? leaveRequestsData.filter(l => l.status === 'Approved')
+      : leaveRequestsData.filter(l => l.status === 'Pending');
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading leave requests...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
+          <p className="text-gray-500 mt-1">Staff vacation and absence requests</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -77,7 +139,7 @@ export default function LeaveManagementPage() {
             ))}
             {weekDays.map((day, i) => {
               const date = 8 + i;
-              const onLeave = leaveRequests.filter(r =>
+              const onLeave = leaveRequestsData.filter((r: any) =>
                 r.status === 'Approved' &&
                 parseInt(r.startDate.split('-')[2]) <= date &&
                 parseInt(r.endDate.split('-')[2]) >= date
@@ -85,7 +147,7 @@ export default function LeaveManagementPage() {
               return (
                 <div key={day} className="border border-gray-100 rounded-lg p-2 min-h-[80px]">
                   <span className="text-xs font-medium text-gray-700">{date}</span>
-                  {onLeave.map(l => (
+                  {onLeave.map((l: any) => (
                     <p key={l.id} className="text-[10px] text-primary-600 bg-primary-50 rounded px-1 mt-1 truncate">
                       {l.staffName.split(' ').pop()}
                     </p>
@@ -111,7 +173,7 @@ export default function LeaveManagementPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center text-primary-700 font-semibold text-sm">
-                      {req.staffName.split(' ').map(n => n[0]).join('')}
+                      {req.staffName.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{req.staffName}</p>

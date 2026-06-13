@@ -3,65 +3,58 @@
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { storeUser, getInitials } from '@/lib/auth-store';
+import { storeUser } from '@/lib/auth-store';
+import { loginSchema } from '@/lib/validations';
+import { api, getErrorMessage } from '@/lib/api-client';
 import MedisphereLogo from '@/components/medisphere-logo';
-
-interface SeedUser {
-  email: string;
-  password: string;
-  id: string;
-  firstName: string;
-  lastName: string;
-  role: 'PATIENT' | 'DOCTOR' | 'NURSE' | 'ADMIN' | 'BILLING';
-}
-
-const seedUsers: SeedUser[] = [
-  { email: 'admin@medisphere.com', password: 'password123', id: '1', firstName: 'Admin', lastName: 'User', role: 'ADMIN' },
-  { email: 'sarah.chen@medisphere.com', password: 'password123', id: '2', firstName: 'Sarah', lastName: 'Chen', role: 'DOCTOR' },
-  { email: 'amy.chen@medisphere.com', password: 'password123', id: '3', firstName: 'Amy', lastName: 'Chen', role: 'NURSE' },
-  { email: 'john.smith@email.com', password: 'password123', id: '4', firstName: 'John', lastName: 'Smith', role: 'PATIENT' },
-  { email: 'billing@medisphere.com', password: 'password123', id: '5', firstName: 'Billing', lastName: 'Officer', role: 'BILLING' },
-  { email: 'emily.j@email.com', password: 'password123', id: '6', firstName: 'Emily', lastName: 'Johnson', role: 'PATIENT' },
-  { email: 'michael.b@email.com', password: 'password123', id: '7', firstName: 'Michael', lastName: 'Brown', role: 'PATIENT' },
-];
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
+    setFieldErrors({});
 
-    await new Promise((r) => setTimeout(r, 800));
-
-    const user = seedUsers.find((u) => u.email === formData.email);
-
-    if (!user || user.password !== formData.password) {
-      setError('Invalid credentials');
-      setIsLoading(false);
+    const result = loginSchema.safeParse(formData);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        errors[err.path[0] as string] = err.message;
+      });
+      setFieldErrors(errors);
       return;
     }
 
-    storeUser({
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.firstName}${user.lastName}`,
-    });
+    setIsLoading(true);
 
-    setIsLoading(false);
-    router.push('/dashboard');
+    try {
+      const data = await api.post<{ user: { id: string; email: string; firstName: string; lastName: string; role: string } }>('/auth/login', formData);
+      storeUser({
+        id: data.user.id,
+        email: data.user.email,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        role: data.user.role as any,
+        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.user.firstName}${data.user.lastName}`,
+      });
+      const redirect = searchParams.get('redirect') || '/dashboard';
+      router.push(redirect);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -86,15 +79,18 @@ export default function LoginPage() {
             </div>
           )}
 
-          <Input
-            label="Email"
-            type="email"
-            placeholder="Enter your email"
-            icon={<Mail className="w-4 h-4" />}
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            required
-          />
+          <div>
+            <Input
+              label="Email"
+              type="email"
+              placeholder="Enter your email"
+              icon={<Mail className="w-4 h-4" />}
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
+            {fieldErrors.email && <p className="text-xs text-red-500 mt-1">{fieldErrors.email}</p>}
+          </div>
 
           <div className="relative">
             <Input
@@ -106,6 +102,7 @@ export default function LoginPage() {
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
             />
+            {fieldErrors.password && <p className="text-xs text-red-500 mt-1">{fieldErrors.password}</p>}
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}

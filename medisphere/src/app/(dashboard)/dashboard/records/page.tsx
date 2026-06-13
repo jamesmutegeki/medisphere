@@ -3,11 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, Search, Plus, Download, Eye, ArrowLeft, User, Calendar, Activity } from 'lucide-react';
+import { FileText, Search, Plus, Download, Eye, ArrowLeft, User, Calendar, Activity, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getStoredUser, getInitials } from '@/lib/auth-store';
+import { api, getErrorMessage } from '@/lib/api-client';
 
 interface Patient {
   id: string;
@@ -26,37 +27,6 @@ interface MedicalRecord {
   doctor: string;
   type: string;
 }
-
-const patients: Patient[] = [
-  { id: 'P-1024', name: 'Emily Johnson', lastVisit: '2026-06-10', condition: 'Hypertension', records: 3 },
-  { id: 'P-1025', name: 'Michael Brown', lastVisit: '2026-06-09', condition: 'Annual Physical', records: 2 },
-  { id: 'P-1026', name: 'Sarah Wilson', lastVisit: '2026-06-08', condition: 'Hyperlipidemia', records: 4 },
-  { id: 'P-1027', name: 'James Davis', lastVisit: '2026-06-07', condition: 'Type 2 Diabetes', records: 5 },
-  { id: 'P-1028', name: 'Maria Garcia', lastVisit: '2026-06-06', condition: 'Pediatric Asthma', records: 2 },
-  { id: 'P-1029', name: 'Robert Kim', lastVisit: '2026-06-05', condition: 'ACL Rehabilitation', records: 3 },
-];
-
-const mockRecords: MedicalRecord[] = [
-  { id: 'MR-001', patientId: 'P-1024', patient: 'Emily Johnson', date: '2026-06-10', diagnosis: 'Hypertension', doctor: 'Dr. Sarah Chen', type: 'Consultation' },
-  { id: 'MR-002', patientId: 'P-1024', patient: 'Emily Johnson', date: '2026-06-03', diagnosis: 'Blood Pressure Follow-up', doctor: 'Dr. Sarah Chen', type: 'Follow-up' },
-  { id: 'MR-003', patientId: 'P-1024', patient: 'Emily Johnson', date: '2026-05-20', diagnosis: 'Initial Evaluation', doctor: 'Dr. Sarah Chen', type: 'Consultation' },
-  { id: 'MR-004', patientId: 'P-1025', patient: 'Michael Brown', date: '2026-06-09', diagnosis: 'Annual Physical - Normal', doctor: 'Dr. Sarah Chen', type: 'Checkup' },
-  { id: 'MR-005', patientId: 'P-1025', patient: 'Michael Brown', date: '2026-05-15', diagnosis: 'Lab Results Review', doctor: 'Dr. Sarah Chen', type: 'Follow-up' },
-  { id: 'MR-006', patientId: 'P-1026', patient: 'Sarah Wilson', date: '2026-06-08', diagnosis: 'Hyperlipidemia', doctor: 'Dr. Sarah Chen', type: 'Follow-up' },
-  { id: 'MR-007', patientId: 'P-1026', patient: 'Sarah Wilson', date: '2026-05-28', diagnosis: 'Cholesterol Panel', doctor: 'Dr. Sarah Chen', type: 'Consultation' },
-  { id: 'MR-008', patientId: 'P-1026', patient: 'Sarah Wilson', date: '2026-05-10', diagnosis: 'Diet and Exercise Counseling', doctor: 'Dr. Sarah Chen', type: 'Checkup' },
-  { id: 'MR-009', patientId: 'P-1026', patient: 'Sarah Wilson', date: '2026-04-22', diagnosis: 'Initial Lipid Assessment', doctor: 'Dr. Sarah Chen', type: 'Consultation' },
-  { id: 'MR-010', patientId: 'P-1027', patient: 'James Davis', date: '2026-06-07', diagnosis: 'Type 2 Diabetes', doctor: 'Dr. Sarah Chen', type: 'Consultation' },
-  { id: 'MR-011', patientId: 'P-1027', patient: 'James Davis', date: '2026-05-30', diagnosis: 'Glucose Monitoring', doctor: 'Dr. Sarah Chen', type: 'Follow-up' },
-  { id: 'MR-012', patientId: 'P-1027', patient: 'James Davis', date: '2026-05-15', diagnosis: 'Insulin Adjustment', doctor: 'Dr. Sarah Chen', type: 'Follow-up' },
-  { id: 'MR-013', patientId: 'P-1027', patient: 'James Davis', date: '2026-05-01', diagnosis: 'Dietary Consultation', doctor: 'Dr. Sarah Chen', type: 'Checkup' },
-  { id: 'MR-014', patientId: 'P-1027', patient: 'James Davis', date: '2026-04-18', diagnosis: 'Diabetes Education', doctor: 'Dr. Sarah Chen', type: 'Consultation' },
-  { id: 'MR-015', patientId: 'P-1028', patient: 'Maria Garcia', date: '2026-06-06', diagnosis: 'Pediatric Asthma', doctor: 'Dr. Sarah Chen', type: 'Emergency' },
-  { id: 'MR-016', patientId: 'P-1028', patient: 'Maria Garcia', date: '2026-05-25', diagnosis: 'Peak Flow Assessment', doctor: 'Dr. Sarah Chen', type: 'Follow-up' },
-  { id: 'MR-017', patientId: 'P-1029', patient: 'Robert Kim', date: '2026-06-05', diagnosis: 'ACL Rehabilitation', doctor: 'Dr. Sarah Chen', type: 'Follow-up' },
-  { id: 'MR-018', patientId: 'P-1029', patient: 'Robert Kim', date: '2026-05-22', diagnosis: 'Post-Op Evaluation', doctor: 'Dr. Sarah Chen', type: 'Consultation' },
-  { id: 'MR-019', patientId: 'P-1029', patient: 'Robert Kim', date: '2026-05-08', diagnosis: 'Physical Therapy Progress', doctor: 'Dr. Sarah Chen', type: 'Follow-up' },
-];
 
 const typeColors: Record<string, string> = {
   'Consultation': 'bg-blue-50 text-blue-700',
@@ -80,9 +50,61 @@ export default function RecordsPage() {
   const [user, setUser] = useState(getStoredUser());
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [mockRecords, setMockRecords] = useState<MedicalRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setUser(getStoredUser());
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ records: any[] }>('/api/medical-records');
+        if (cancelled) return;
+        const items = data.records || [];
+        const records: MedicalRecord[] = items.map((r: any, idx: number) => ({
+          id: r.id || `MR-${idx}`,
+          patientId: r.patientId || r.patient?.id || '',
+          patient: r.patient ? `${r.patient.firstName} ${r.patient.lastName}` : 'Unknown',
+          date: r.date || '',
+          diagnosis: r.diagnosis || '',
+          doctor: r.doctor ? `Dr. ${r.doctor.firstName} ${r.doctor.lastName}` : 'Unassigned',
+          type: r.type || 'Consultation',
+        }));
+        setMockRecords(records);
+
+        const patientMap = new Map<string, Patient>();
+        items.forEach((r: any) => {
+          const pid = r.patientId || r.patient?.id || '';
+          if (pid && !patientMap.has(pid)) {
+            patientMap.set(pid, {
+              id: pid,
+              name: r.patient ? `${r.patient.firstName} ${r.patient.lastName}` : 'Unknown',
+              lastVisit: r.date || '',
+              condition: r.diagnosis || '',
+              records: 0,
+            });
+          }
+          if (pid) {
+            const p = patientMap.get(pid);
+            if (p) p.records = (p.records || 0) + 1;
+          }
+        });
+        setPatients(Array.from(patientMap.values()));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
   }, []);
 
   const isDoctor = user?.role === 'DOCTOR';
@@ -107,6 +129,40 @@ export default function RecordsPage() {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading records...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Medical Records</h1>
+            <p className="text-gray-500 mt-1">Access and manage patient electronic health records</p>
+          </div>
+          <Button onClick={() => router.push('/dashboard/records/new')}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Record
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isDoctor && !selectedPatient) {
     return (

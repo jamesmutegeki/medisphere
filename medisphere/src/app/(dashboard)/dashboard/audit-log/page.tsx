@@ -1,29 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { Search, Shield, Filter, Calendar } from 'lucide-react';
+import { Search, Shield, Filter, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const auditEntries = [
-  { id: 1, timestamp: '2026-06-12 09:15:23', user: 'Dr. Sarah Chen', action: 'CREATE', resource: 'Patient Record', resourceId: 'P-1001', details: 'Created new patient record for Emily Johnson' },
-  { id: 2, timestamp: '2026-06-12 09:30:45', user: 'Nurse Amy Chen', action: 'UPDATE', resource: 'Vitals', resourceId: 'P-1001', details: 'Updated vitals for Emily Johnson' },
-  { id: 3, timestamp: '2026-06-12 10:00:12', user: 'Dr. James Wilson', action: 'READ', resource: 'Lab Results', resourceId: 'L-0452', details: 'Viewed lab results for Michael Brown' },
-  { id: 4, timestamp: '2026-06-12 10:22:08', user: 'Admin Linda', action: 'LOGIN', resource: 'System', resourceId: '-', details: 'User logged in from IP 192.168.1.100' },
-  { id: 5, timestamp: '2026-06-12 10:45:33', user: 'Dr. Lisa Park', action: 'CREATE', resource: 'Prescription', resourceId: 'RX-0789', details: 'Prescribed Amoxicillin for Sarah Wilson' },
-  { id: 6, timestamp: '2026-06-12 11:05:17', user: 'Dr. Robert Martinez', action: 'DELETE', resource: 'Appointment', resourceId: 'A-1004', details: 'Cancelled appointment for James Davis' },
-  { id: 7, timestamp: '2026-06-12 11:30:55', user: 'Nurse Robert Taylor', action: 'UPDATE', resource: 'Medication Admin', resourceId: 'M-0331', details: 'Administered medication to patient P-1003' },
-  { id: 8, timestamp: '2026-06-11 14:20:00', user: 'Dr. Maria Garcia', action: 'READ', resource: 'Imaging Report', resourceId: 'IMG-021', details: 'Reviewed MRI results for pediatric patient' },
-  { id: 9, timestamp: '2026-06-11 15:10:22', user: 'Admin Linda', action: 'CREATE', resource: 'User Account', resourceId: 'U-055', details: 'Created account for new staff member' },
-  { id: 10, timestamp: '2026-06-11 16:00:45', user: 'Dr. David Kim', action: 'UPDATE', resource: 'Patient Record', resourceId: 'P-1007', details: 'Updated contact information for Robert Kim' },
-  { id: 11, timestamp: '2026-06-11 08:30:00', user: 'Dr. Jennifer Wang', action: 'LOGIN', resource: 'System', resourceId: '-', details: 'User logged in from IP 192.168.1.105' },
-  { id: 12, timestamp: '2026-06-10 13:45:30', user: 'Nurse Emily Davis', action: 'CREATE', resource: 'Incident Report', resourceId: 'IR-003', details: 'Created incident report for slip in Ward B' },
-  { id: 13, timestamp: '2026-06-10 10:15:10', user: 'Dr. Sarah Chen', action: 'UPDATE', resource: 'Treatment Plan', resourceId: 'TP-012', details: 'Updated treatment plan for cardiac patient' },
-  { id: 14, timestamp: '2026-06-09 09:00:00', user: 'Admin Linda', action: 'DELETE', resource: 'User Account', resourceId: 'U-022', details: 'Deactivated former employee account' },
-  { id: 15, timestamp: '2026-06-09 11:20:35', user: 'Nurse John Smith', action: 'READ', resource: 'Patient Record', resourceId: 'P-1004', details: 'Accessed medical history for James Davis' },
-];
+import { api, buildQueryString, getErrorMessage } from '@/lib/api-client';
 
 const actionColors: Record<string, string> = {
   CREATE: 'bg-green-50 text-green-700',
@@ -38,17 +21,87 @@ const ITEMS_PER_PAGE = 6;
 export default function AuditLogPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [auditEntriesData, setAuditEntriesData] = useState<any[]>([]);
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const filtered = auditEntries.filter(e =>
-    e.user.toLowerCase().includes(search.toLowerCase()) ||
-    e.action.toLowerCase().includes(search.toLowerCase()) ||
-    e.resource.toLowerCase().includes(search.toLowerCase()) ||
-    e.resourceId.toLowerCase().includes(search.toLowerCase()) ||
-    e.details.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const qs = buildQueryString({ page, limit: ITEMS_PER_PAGE, search: search || undefined });
+        const res = await api.get<any>(`/api/audit-logs${qs}`);
+        if (cancelled) return;
+        const items = res.data ?? res.auditLogs ?? res.logs ?? [];
+        const mapped = items.map((e: any) => {
+          const firstName = e.user?.firstName ?? '';
+          const lastName = e.user?.lastName ?? '';
+          return {
+            id: e.id,
+            timestamp: e.timestamp
+              ? e.timestamp.includes('T')
+                ? new Date(e.timestamp).toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                : e.timestamp
+              : '',
+            user: `${firstName} ${lastName}`.trim() || e.userName || 'Unknown',
+            action: e.action ?? '',
+            resource: e.resource ?? '',
+            resourceId: e.resourceId ?? e.resource_id ?? '',
+            details: e.details ?? e.detail ?? '',
+          };
+        });
+        setAuditEntriesData(mapped);
+        setTotalEntries(res.total ?? items.length);
+        setTotalPages(res.totalPages ?? Math.ceil((res.total ?? items.length) / ITEMS_PER_PAGE));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, [search, page]);
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paged = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+  };
+
+  if (loading && auditEntriesData.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading audit log...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Audit Log Viewer</h1>
+          <p className="text-gray-500 mt-1">Searchable compliance audit trail</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -67,7 +120,7 @@ export default function AuditLogPage() {
                 type="text"
                 placeholder="Search audit entries..."
                 value={search}
-                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                onChange={handleSearchChange}
                 className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
@@ -97,10 +150,15 @@ export default function AuditLogPage() {
           <CardTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-primary-600" />
             Audit Entries
-            <span className="text-sm font-normal text-gray-400 ml-2">({filtered.length} entries)</span>
+            <span className="text-sm font-normal text-gray-400 ml-2">({totalEntries} entries)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {loading && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -114,7 +172,7 @@ export default function AuditLogPage() {
                 </tr>
               </thead>
               <tbody>
-                {paged.map((entry, index) => (
+                {auditEntriesData.map((entry, index) => (
                   <motion.tr
                     key={entry.id}
                     initial={{ opacity: 0 }}

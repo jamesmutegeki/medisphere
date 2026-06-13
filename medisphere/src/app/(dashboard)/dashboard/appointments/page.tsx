@@ -1,19 +1,13 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, User, Filter, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, User, Filter, Plus, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const appointments = [
-  { id: 'A-1001', patient: 'Emily Johnson', type: 'Cardiology Follow-up', date: '2026-06-12', time: '10:30 AM', status: 'In Progress', doctor: 'Dr. Sarah Chen' },
-  { id: 'A-1002', patient: 'Michael Brown', type: 'Annual Physical', date: '2026-06-12', time: '11:00 AM', status: 'Confirmed', doctor: 'Dr. Sarah Chen' },
-  { id: 'A-1003', patient: 'Sarah Wilson', type: 'Lab Results Review', date: '2026-06-12', time: '11:30 AM', status: 'Scheduled', doctor: 'Dr. Sarah Chen' },
-  { id: 'A-1004', patient: 'James Davis', type: 'Prescription Refill', date: '2026-06-12', time: '1:00 PM', status: 'Scheduled', doctor: 'Dr. Sarah Chen' },
-  { id: 'A-1005', patient: 'Maria Garcia', type: 'Pediatric Checkup', date: '2026-06-13', time: '9:00 AM', status: 'Scheduled', doctor: 'Dr. Sarah Chen' },
-  { id: 'A-1006', patient: 'Robert Kim', type: 'Follow-up', date: '2026-06-13', time: '10:00 AM', status: 'Scheduled', doctor: 'Dr. Sarah Chen' },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 const statusColors: Record<string, string> = {
   'Scheduled': 'bg-gray-50 text-gray-600',
@@ -24,6 +18,39 @@ const statusColors: Record<string, string> = {
 };
 
 export default function AppointmentsPage() {
+  const [appointments, setAppointments] = useState<{
+    id: string; patient: string; type: string; date: string; time: string; status: string; doctor: string;
+  }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ appointments: any[] }>('/api/appointments');
+        if (cancelled) return;
+        setAppointments((data.appointments || []).map((a: any) => ({
+          id: a.id,
+          patient: a.patient ? `${a.patient.firstName} ${a.patient.lastName}` : 'Unknown',
+          type: a.type || '',
+          date: a.date || '',
+          time: a.startTime || '',
+          status: a.status || 'Scheduled',
+          doctor: a.doctor ? `Dr. ${a.doctor.firstName} ${a.doctor.lastName}` : 'Unassigned',
+        })));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -37,6 +64,26 @@ export default function AppointmentsPage() {
         </Button>
       </div>
 
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+          <span className="ml-3 text-gray-500">Loading appointments...</span>
+        </div>
+      )}
+
+      {error && !loading && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && !error && (
+      <>
       {/* Calendar Header */}
       <Card>
         <CardContent className="p-4">
@@ -130,6 +177,8 @@ export default function AppointmentsPage() {
           </div>
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

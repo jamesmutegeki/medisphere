@@ -1,25 +1,12 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { Package, AlertTriangle, Warehouse, Tags } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Package, AlertTriangle, Warehouse, Tags, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-const inventoryItems = [
-  { id: 1, name: 'Surgical Gloves (Box)', category: 'Consumables', quantity: 240, unit: 'Boxes', reorderLevel: 50, supplier: 'MedSupply Co.', status: 'In Stock' },
-  { id: 2, name: 'Syringes 5ml', category: 'Consumables', quantity: 30, unit: 'Boxes', reorderLevel: 100, supplier: 'HealthDirect', status: 'Low Stock' },
-  { id: 3, name: 'ECG Electrodes', category: 'Consumables', quantity: 500, unit: 'Packs', reorderLevel: 200, supplier: 'CardioTech', status: 'In Stock' },
-  { id: 4, name: 'Stethoscope', category: 'Instruments', quantity: 15, unit: 'Units', reorderLevel: 5, supplier: 'DiagnosticPro', status: 'In Stock' },
-  { id: 5, name: 'Blood Pressure Cuff', category: 'Instruments', quantity: 3, unit: 'Units', reorderLevel: 10, supplier: 'DiagnosticPro', status: 'Low Stock' },
-  { id: 6, name: 'Amoxicillin 500mg', category: 'Medications', quantity: 12, unit: 'Bottles', reorderLevel: 20, supplier: 'PharmaCare', status: 'Low Stock' },
-  { id: 7, name: 'Ibuprofen 200mg', category: 'Medications', quantity: 45, unit: 'Bottles', reorderLevel: 15, supplier: 'PharmaCare', status: 'In Stock' },
-  { id: 8, name: 'N95 Respirator Masks', category: 'PPE', quantity: 8, unit: 'Boxes', reorderLevel: 25, supplier: 'SafetyFirst', status: 'Low Stock' },
-  { id: 9, name: 'Surgical Masks', category: 'PPE', quantity: 200, unit: 'Boxes', reorderLevel: 50, supplier: 'SafetyFirst', status: 'In Stock' },
-  { id: 10, name: 'Scalpel Blades #10', category: 'Instruments', quantity: 80, unit: 'Packs', reorderLevel: 30, supplier: 'SurgiKit', status: 'In Stock' },
-  { id: 11, name: 'IV Tubing Set', category: 'Consumables', quantity: 18, unit: 'Boxes', reorderLevel: 40, supplier: 'HealthDirect', status: 'Low Stock' },
-  { id: 12, name: 'Hand Sanitizer 1L', category: 'PPE', quantity: 35, unit: 'Bottles', reorderLevel: 10, supplier: 'SafetyFirst', status: 'In Stock' },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 const categories = ['All', 'Consumables', 'Instruments', 'Medications', 'PPE'];
 
@@ -31,6 +18,37 @@ const statusColors: Record<string, string> = {
 
 export default function InventoryPage() {
   const [activeCategory, setActiveCategory] = useState('All');
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ inventory: any[] }>('/api/inventory');
+        if (cancelled) return;
+        setInventoryItems((data.inventory || []).map((item: any, idx: number) => ({
+          id: item.id ?? idx,
+          name: item.name || item.itemName || '',
+          category: item.category || 'Consumables',
+          quantity: item.quantity ?? 0,
+          unit: item.unit || 'Units',
+          reorderLevel: item.reorderLevel ?? 0,
+          supplier: item.supplier || '',
+          status: (item.quantity ?? 0) <= 0 ? 'Out of Stock' : (item.quantity ?? 0) <= (item.reorderLevel ?? 0) ? 'Low Stock' : 'In Stock',
+        })));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = activeCategory === 'All'
     ? inventoryItems
@@ -39,6 +57,34 @@ export default function InventoryPage() {
   const totalItems = inventoryItems.length;
   const lowStock = inventoryItems.filter(i => i.status === 'Low Stock').length;
   const categoryCount = new Set(inventoryItems.map(i => i.category)).size;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading inventory...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Inventory & Supplies</h1>
+          <p className="text-gray-500 mt-1">Track medical supplies and consumables</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -1,42 +1,12 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Users, AlertTriangle, ArrowUpDown } from 'lucide-react';
+import { Clock, Users, AlertTriangle, ArrowUpDown, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const departments = ['Emergency', 'General', 'Pediatrics'];
-
-interface QueueItem {
-  id: string;
-  name: string;
-  checkIn: string;
-  estimatedWait: string;
-  priority: 'Critical' | 'High' | 'Normal' | 'Low';
-}
-
-const queueData: Record<string, QueueItem[]> = {
-  Emergency: [
-    { id: 'Q-001', name: 'James Miller', checkIn: '10:15 AM', estimatedWait: '15 min', priority: 'Critical' },
-    { id: 'Q-002', name: 'Sarah Connor', checkIn: '10:30 AM', estimatedWait: '25 min', priority: 'High' },
-    { id: 'Q-003', name: 'Robert Adams', checkIn: '10:45 AM', estimatedWait: '40 min', priority: 'Normal' },
-    { id: 'Q-004', name: 'Emily Watson', checkIn: '11:00 AM', estimatedWait: '50 min', priority: 'Normal' },
-    { id: 'Q-005', name: 'Michael Torres', checkIn: '11:15 AM', estimatedWait: '60 min', priority: 'Low' },
-  ],
-  General: [
-    { id: 'Q-006', name: 'Linda Park', checkIn: '09:00 AM', estimatedWait: '20 min', priority: 'Normal' },
-    { id: 'Q-007', name: 'David Kim', checkIn: '09:30 AM', estimatedWait: '30 min', priority: 'Normal' },
-    { id: 'Q-008', name: 'Anna Wright', checkIn: '10:00 AM', estimatedWait: '45 min', priority: 'Low' },
-    { id: 'Q-009', name: 'Peter Johnson', checkIn: '10:20 AM', estimatedWait: '35 min', priority: 'Normal' },
-  ],
-  Pediatrics: [
-    { id: 'Q-010', name: 'Sophia Brown', checkIn: '10:00 AM', estimatedWait: '20 min', priority: 'High' },
-    { id: 'Q-011', name: 'Ethan Garcia', checkIn: '10:30 AM', estimatedWait: '30 min', priority: 'Normal' },
-    { id: 'Q-012', name: 'Olivia Martinez', checkIn: '11:00 AM', estimatedWait: '40 min', priority: 'Normal' },
-  ],
-};
+import { api, getErrorMessage } from '@/lib/api-client';
 
 const priorityColors: Record<string, string> = {
   Critical: 'bg-red-50 text-red-700',
@@ -47,14 +17,95 @@ const priorityColors: Record<string, string> = {
 
 export default function WaitlistPage() {
   const [activeDept, setActiveDept] = useState('Emergency');
+  const [queueData, setQueueData] = useState<Record<string, any[]>>({});
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const res = await api.get<any>('/api/waitlist');
+        if (cancelled) return;
+        const items = Array.isArray(res) ? res : res.waitlist ?? res.data ?? [];
+        const grouped: Record<string, any[]> = {};
+        for (const w of items) {
+          const dept = w.department ?? 'General';
+          if (!grouped[dept]) grouped[dept] = [];
+          const firstName = w.patient?.firstName ?? '';
+          const lastName = w.patient?.lastName ?? '';
+          grouped[dept].push({
+            id: w.id ?? `W-${Math.random().toString(36).slice(2, 6)}`,
+            name: `${firstName} ${lastName}`.trim() || w.patientName || 'Unknown',
+            checkIn: w.checkInTime
+              ? w.checkInTime.includes('T')
+                ? new Date(w.checkInTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                : w.checkInTime
+              : '',
+            estimatedWait: w.estimatedWait ?? '',
+            priority: w.priority ?? 'Normal',
+          });
+        }
+        setQueueData(grouped);
+        setDepartments(Object.keys(grouped));
+        if (!grouped[activeDept] && Object.keys(grouped).length > 0) {
+          setActiveDept(Object.keys(grouped)[0]);
+        }
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, [activeDept]);
+
   const queue = queueData[activeDept] || [];
   const totalWaiting = queue.length;
   const avgWait = queue.length > 0
-    ? Math.round(queue.reduce((sum, q) => sum + parseInt(q.estimatedWait), 0) / queue.length)
+    ? Math.round(queue.reduce((sum, q) => {
+        const mins = parseInt(q.estimatedWait);
+        return sum + (isNaN(mins) ? 0 : mins);
+      }, 0) / queue.length)
     : 0;
   const longestWait = queue.length > 0
-    ? Math.max(...queue.map((q) => parseInt(q.estimatedWait)))
+    ? Math.max(...queue.map((q: any) => {
+        const mins = parseInt(q.estimatedWait);
+        return isNaN(mins) ? 0 : mins;
+      }))
     : 0;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading waitlist...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Waitlist & Queue Management</h1>
+          <p className="text-gray-500 mt-1">Live queue board for ER and walk-in clinics</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -123,7 +174,7 @@ export default function WaitlistPage() {
                 </tr>
               </thead>
               <tbody>
-                {queue.map((item, index) => (
+                {queue.map((item: any, index: number) => (
                   <motion.tr
                     key={item.id}
                     initial={{ opacity: 0 }}

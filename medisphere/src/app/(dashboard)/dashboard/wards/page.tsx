@@ -1,100 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Bed, Users, Activity, AlertCircle } from 'lucide-react';
+import { Building2, Bed, Users, Activity, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-const wards = [
-  {
-    name: 'Emergency Room',
-    type: 'EMERGENCY',
-    total: 20,
-    available: 3,
-    occupied: 17,
-    beds: [
-      { id: 'ER-01', status: 'OCCUPIED', patient: 'John D.' },
-      { id: 'ER-02', status: 'OCCUPIED', patient: 'Lisa M.' },
-      { id: 'ER-03', status: 'AVAILABLE' },
-      { id: 'ER-04', status: 'OCCUPIED', patient: 'Tom R.' },
-      { id: 'ER-05', status: 'OCCUPIED', patient: 'Anna K.' },
-      { id: 'ER-06', status: 'AVAILABLE' },
-      { id: 'ER-07', status: 'OCCUPIED', patient: 'Mike P.' },
-      { id: 'ER-08', status: 'MAINTENANCE' },
-    ],
-  },
-  {
-    name: 'Intensive Care Unit',
-    type: 'ICU',
-    total: 15,
-    available: 2,
-    occupied: 13,
-    beds: [
-      { id: 'ICU-01', status: 'OCCUPIED', patient: 'Sarah W.' },
-      { id: 'ICU-02', status: 'OCCUPIED', patient: 'David L.' },
-      { id: 'ICU-03', status: 'OCCUPIED', patient: 'Mary J.' },
-      { id: 'ICU-04', status: 'AVAILABLE' },
-      { id: 'ICU-05', status: 'OCCUPIED', patient: 'Bob S.' },
-      { id: 'ICU-06', status: 'RESERVED' },
-    ],
-  },
-  {
-    name: 'General Ward',
-    type: 'GENERAL',
-    total: 40,
-    available: 12,
-    occupied: 28,
-    beds: [
-      { id: 'GW-01', status: 'AVAILABLE' },
-      { id: 'GW-02', status: 'OCCUPIED', patient: 'Emily J.' },
-      { id: 'GW-03', status: 'OCCUPIED', patient: 'Michael B.' },
-      { id: 'GW-04', status: 'AVAILABLE' },
-      { id: 'GW-05', status: 'OCCUPIED', patient: 'James D.' },
-      { id: 'GW-06', status: 'AVAILABLE' },
-    ],
-  },
-  {
-    name: 'Pediatrics',
-    type: 'PEDIATRICS',
-    total: 20,
-    available: 8,
-    occupied: 12,
-    beds: [
-      { id: 'PD-01', status: 'OCCUPIED', patient: 'Lily A.' },
-      { id: 'PD-02', status: 'AVAILABLE' },
-      { id: 'PD-03', status: 'OCCUPIED', patient: 'Noah C.' },
-      { id: 'PD-04', status: 'AVAILABLE' },
-      { id: 'PD-05', status: 'OCCUPIED', patient: 'Emma R.' },
-    ],
-  },
-  {
-    name: 'Maternity',
-    type: 'MATERNITY',
-    total: 15,
-    available: 5,
-    occupied: 10,
-    beds: [
-      { id: 'MT-01', status: 'OCCUPIED', patient: 'Rachel G.' },
-      { id: 'MT-02', status: 'OCCUPIED', patient: 'Sophia T.' },
-      { id: 'MT-03', status: 'AVAILABLE' },
-      { id: 'MT-04', status: 'RESERVED' },
-      { id: 'MT-05', status: 'OCCUPIED', patient: 'Jessica M.' },
-    ],
-  },
-  {
-    name: 'Surgery',
-    type: 'SURGERY',
-    total: 10,
-    available: 3,
-    occupied: 7,
-    beds: [
-      { id: 'SR-01', status: 'OCCUPIED', patient: 'Robert K.' },
-      { id: 'SR-02', status: 'AVAILABLE' },
-      { id: 'SR-03', status: 'OCCUPIED', patient: 'William H.' },
-      { id: 'SR-04', status: 'OCCUPIED', patient: 'Linda F.' },
-    ],
-  },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
 
 const bedStatusColors: Record<string, string> = {
   AVAILABLE: 'bg-green-100 border-green-300 text-green-700',
@@ -104,6 +15,83 @@ const bedStatusColors: Record<string, string> = {
 };
 
 export default function WardsPage() {
+  const [wardsData, setWardsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const [wardsRes, bedsRes] = await Promise.all([
+          api.get<any>('/api/wards'),
+          api.get<any>('/api/beds'),
+        ]);
+        if (cancelled) return;
+        const wards = Array.isArray(wardsRes) ? wardsRes : wardsRes.wards ?? wardsRes.data ?? [];
+        const beds = Array.isArray(bedsRes) ? bedsRes : bedsRes.beds ?? bedsRes.data ?? [];
+        const mapped = wards.map((w: any) => {
+          const wardBeds = beds.filter((b: any) => b.wardId === w.id || b.ward === w.name);
+          return {
+            name: w.name,
+            type: w.type,
+            total: w.totalBeds ?? w.total ?? 0,
+            available: w.availableBeds ?? w.available ?? 0,
+            occupied: w.occupiedBeds ?? w.occupied ?? 0,
+            beds: wardBeds.map((b: any) => ({
+              id: b.id ?? b.bedId,
+              status: b.status,
+              patient: b.patient
+                ? typeof b.patient === 'string'
+                  ? b.patient
+                  : `${b.patient.firstName ?? ''} ${b.patient.lastName ?? ''}`.trim()
+                : undefined,
+            })),
+          };
+        });
+        setWardsData(mapped);
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading bed & ward data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Bed & Ward Management</h1>
+            <p className="text-gray-500 mt-1">Live visual map of bed occupancy across all departments</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -120,8 +108,8 @@ export default function WardsPage() {
       </div>
 
       <div className="grid lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {wards.map((ward, wardIndex) => {
-          const occupancyPercent = Math.round((ward.occupied / ward.total) * 100);
+        {wardsData.map((ward, wardIndex) => {
+          const occupancyPercent = ward.total > 0 ? Math.round((ward.occupied / ward.total) * 100) : 0;
           return (
             <motion.div
               key={ward.name}
@@ -162,7 +150,7 @@ export default function WardsPage() {
 
                   {/* Bed grid */}
                   <div className="grid grid-cols-4 gap-2">
-                    {ward.beds.map((bed) => (
+                    {ward.beds.map((bed: any) => (
                       <div
                         key={bed.id}
                         className={cn(

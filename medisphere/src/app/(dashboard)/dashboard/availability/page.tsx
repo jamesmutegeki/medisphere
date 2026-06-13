@@ -1,28 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, User } from 'lucide-react';
+import { Calendar, Clock, User, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const doctors = [
-  { id: 'D-001', name: 'Dr. Sarah Chen' },
-  { id: 'D-002', name: 'Dr. Michael Lee' },
-  { id: 'D-003', name: 'Dr. James Wilson' },
-];
+import { api, buildQueryString, getErrorMessage } from '@/lib/api-client';
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const hours = Array.from({ length: 9 }, (_, i) => `${i + 8}:00`);
-
-const initialSlots: Record<string, Record<string, 'available' | 'booked' | 'unavailable'>> = {
-  'Monday': { '8:00': 'available', '9:00': 'available', '10:00': 'booked', '11:00': 'available', '12:00': 'unavailable', '13:00': 'available', '14:00': 'booked', '15:00': 'available', '16:00': 'available' },
-  'Tuesday': { '8:00': 'available', '9:00': 'booked', '10:00': 'available', '11:00': 'available', '12:00': 'available', '13:00': 'unavailable', '14:00': 'available', '15:00': 'booked', '16:00': 'available' },
-  'Wednesday': { '8:00': 'unavailable', '9:00': 'available', '10:00': 'available', '11:00': 'booked', '12:00': 'available', '13:00': 'available', '14:00': 'available', '15:00': 'available', '16:00': 'booked' },
-  'Thursday': { '8:00': 'available', '9:00': 'available', '10:00': 'available', '11:00': 'available', '12:00': 'booked', '13:00': 'available', '14:00': 'booked', '15:00': 'available', '16:00': 'unavailable' },
-  'Friday': { '8:00': 'booked', '9:00': 'available', '10:00': 'available', '11:00': 'unavailable', '12:00': 'available', '13:00': 'available', '14:00': 'available', '15:00': 'booked', '16:00': 'available' },
-};
 
 const slotColors: Record<string, string> = {
   available: 'bg-green-100 hover:bg-green-200 text-green-700',
@@ -36,14 +23,101 @@ const slotLabels: Record<string, string> = {
   unavailable: 'Unavailable',
 };
 
+function getWeekDates(): string[] {
+  const today = new Date();
+  const day = today.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + diff);
+  return Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d.toISOString().split('T')[0];
+  });
+}
+
 export default function AvailabilityPage() {
-  const [selectedDoctor, setSelectedDoctor] = useState(doctors[0].id);
-  const [slots, setSlots] = useState(initialSlots);
+  const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [doctors, setDoctors] = useState<{ id: string; name: string }[]>([]);
+  const [slots, setSlots] = useState<Record<string, Record<string, 'available' | 'booked' | 'unavailable'>>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchDoctors() {
+      try {
+        setLoading(true);
+        setError('');
+        const res = await api.get<any>('/api/users?role=DOCTOR');
+        if (cancelled) return;
+        const users = Array.isArray(res) ? res : res.users ?? res.data ?? [];
+        const mapped = users.map((u: any) => ({
+          id: u.id,
+          name: `Dr. ${u.firstName ?? ''} ${u.lastName ?? ''}`.trim(),
+        }));
+        setDoctors(mapped);
+        if (mapped.length > 0 && !selectedDoctor) {
+          setSelectedDoctor(mapped[0].id);
+        }
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchDoctors();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDoctor) return;
+    let cancelled = false;
+    async function fetchAvailability() {
+      try {
+        setLoading(true);
+        const weekDates = getWeekDates();
+        const allSlots: Record<string, Record<string, 'available' | 'booked' | 'unavailable'>> = {};
+        for (const date of weekDates) {
+          const qs = buildQueryString({ doctorId: selectedDoctor, date });
+          const res = await api.get<any>(`/api/doctor-availability${qs}`);
+          if (cancelled) return;
+          const slotsArr = Array.isArray(res) ? res : res.slots ?? res.data ?? [];
+          const daySlots: Record<string, 'available' | 'booked' | 'unavailable'> = {};
+          for (const h of hours) {
+            daySlots[h] = 'unavailable';
+          }
+          for (const s of slotsArr) {
+            const hour = s.hour ?? s.time ?? '';
+            const status = s.status === 'BOOKED' ? 'booked' : s.status === 'AVAILABLE' ? 'available' : 'unavailable';
+            if (daySlots[hour] !== undefined) {
+              daySlots[hour] = status;
+            }
+          }
+          const dayName = days[weekDates.indexOf(date)];
+          allSlots[dayName] = daySlots;
+        }
+        if (!cancelled) setSlots(allSlots);
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchAvailability();
+    return () => { cancelled = true; };
+  }, [selectedDoctor]);
+
+  useEffect(() => {
+    if (doctors.length > 0 && !selectedDoctor) {
+      setSelectedDoctor(doctors[0].id);
+    }
+  }, [doctors, selectedDoctor]);
 
   const toggleSlot = (day: string, hour: string) => {
     setSlots((prev) => {
-      const current = prev[day][hour];
-      if (current === 'booked') return prev;
+      const current = prev[day]?.[hour];
+      if (!current || current === 'booked') return prev;
       const next = current === 'available' ? 'unavailable' : 'available';
       return {
         ...prev,
@@ -51,6 +125,34 @@ export default function AvailabilityPage() {
       };
     });
   };
+
+  if (loading && doctors.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading availability data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Doctor Availability</h1>
+          <p className="text-gray-500 mt-1">Manage consultation schedules</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -88,6 +190,11 @@ export default function AvailabilityPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {loading && (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -106,7 +213,7 @@ export default function AvailabilityPage() {
                       {hour}
                     </td>
                     {days.map((day) => {
-                      const status = slots[day][hour];
+                      const status = slots[day]?.[hour] ?? 'unavailable';
                       return (
                         <td key={day} className="py-1 px-2">
                           <button

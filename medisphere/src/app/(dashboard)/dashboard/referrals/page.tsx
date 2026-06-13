@@ -1,22 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
-import { ArrowRightLeft, User, Building2, AlertTriangle } from 'lucide-react';
+import { ArrowRightLeft, User, Building2, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const referrals = [
-  { id: 'R-1001', patient: 'Emily Johnson', referringDoctor: 'Dr. Sarah Chen', referredTo: 'Cardiology', priority: 'Urgent', reason: 'Chest pain with abnormal ECG', status: 'Pending', date: '2026-06-10' },
-  { id: 'R-1002', patient: 'Michael Brown', referringDoctor: 'Dr. James Wilson', referredTo: 'Orthopedics', priority: 'Normal', reason: 'Knee pain assessment', status: 'Accepted', date: '2026-06-09' },
-  { id: 'R-1003', patient: 'Sarah Wilson', referringDoctor: 'Dr. Lisa Park', referredTo: 'Neurology', priority: 'Emergency', reason: 'Suspected stroke symptoms', status: 'Pending', date: '2026-06-08' },
-  { id: 'R-1004', patient: 'James Davis', referringDoctor: 'Dr. Robert Martinez', referredTo: 'Dermatology', priority: 'Normal', reason: 'Rash investigation', status: 'Declined', date: '2026-06-07' },
-  { id: 'R-1005', patient: 'Maria Garcia', referringDoctor: 'Dr. Sarah Chen', referredTo: 'Pediatrics', priority: 'Normal', reason: 'Growth milestone check', status: 'Accepted', date: '2026-06-06' },
-  { id: 'R-1006', patient: 'Robert Kim', referringDoctor: 'Dr. David Kim', referredTo: 'Ophthalmology', priority: 'Urgent', reason: 'Vision loss concern', status: 'Pending', date: '2026-06-05' },
-  { id: 'R-1007', patient: 'Linda Foster', referringDoctor: 'Dr. Jennifer Wang', referredTo: 'Endocrinology', priority: 'Normal', reason: 'Thyroid function review', status: 'Pending', date: '2026-06-04' },
-  { id: 'R-1008', patient: 'Thomas Anderson', referringDoctor: 'Dr. Maria Garcia', referredTo: 'Gastroenterology', priority: 'Emergency', reason: 'Acute abdominal pain', status: 'Accepted', date: '2026-06-03' },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
 
 const statusColors: Record<string, string> = {
   Pending: 'bg-amber-50 text-amber-700',
@@ -34,8 +24,75 @@ const tabs = ['All', 'Pending', 'Accepted', 'Declined'];
 
 export default function ReferralsPage() {
   const [activeTab, setActiveTab] = useState('All');
+  const [referralsData, setReferralsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const filtered = activeTab === 'All' ? referrals : referrals.filter(r => r.status === activeTab);
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const res = await api.get<any>('/api/referrals');
+        if (cancelled) return;
+        const items = Array.isArray(res) ? res : res.referrals ?? res.data ?? [];
+        const mapped = items.map((r: any) => ({
+          id: r.id ?? `REF-${Math.random().toString(36).slice(2, 6)}`,
+          patient: r.patient
+            ? `${r.patient.firstName ?? ''} ${r.patient.lastName ?? ''}`.trim()
+            : r.patientName ?? 'Unknown',
+          referringDoctor: r.referringDoctor
+            ? `Dr. ${r.referringDoctor.firstName ?? ''} ${r.referringDoctor.lastName ?? ''}`.trim()
+            : r.referringDoctorName ?? 'Dr. Unknown',
+          referredTo: r.referredTo ?? r.department ?? '',
+          priority: r.priority ?? 'Normal',
+          reason: r.reason ?? '',
+          status: r.status ?? 'Pending',
+          date: r.date ? r.date.split('T')[0] : '',
+        }));
+        setReferralsData(mapped);
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filtered = activeTab === 'All' ? referralsData : referralsData.filter(r => r.status === activeTab);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading referrals...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Referral Management</h1>
+            <p className="text-gray-500 mt-1">Track patient referrals across departments</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -78,7 +135,7 @@ export default function ReferralsPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center text-primary-700 font-semibold text-sm">
-                      {ref.patient.split(' ').map(n => n[0]).join('')}
+                      {ref.patient.split(' ').map((n: string) => n[0]).join('')}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">{ref.patient}</p>

@@ -1,20 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Plus, Search, CheckCircle, XCircle } from 'lucide-react';
+import { Shield, Plus, Search, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const claims = [
-  { id: 'CL-001', patient: 'Emily Johnson', provider: 'BlueCross', amount: 1200.00, status: 'Approved', date: '2026-06-08' },
-  { id: 'CL-002', patient: 'Michael Brown', provider: 'Aetna', amount: 2500.00, status: 'In Review', date: '2026-06-07' },
-  { id: 'CL-003', patient: 'Sarah Wilson', provider: 'Cigna', amount: 800.00, status: 'Submitted', date: '2026-06-06' },
-  { id: 'CL-004', patient: 'James Davis', provider: 'BlueCross', amount: 3400.00, status: 'Approved', date: '2026-06-05' },
-  { id: 'CL-005', patient: 'Maria Garcia', provider: 'UnitedHealth', amount: 1500.00, status: 'Denied', date: '2026-06-04' },
-  { id: 'CL-006', patient: 'Robert Kim', provider: 'Aetna', amount: 950.00, status: 'In Review', date: '2026-06-03' },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 const statusColors: Record<string, string> = {
   'Approved': 'bg-green-50 text-green-700',
@@ -26,6 +20,70 @@ const statusColors: Record<string, string> = {
 
 export default function InsurancePage() {
   const router = useRouter();
+  const [claims, setClaims] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ claims: any[] }>('/api/insurance-claims');
+        if (cancelled) return;
+        setClaims((data.claims || []).map((c: any) => ({
+          id: c.id,
+          patient: c.patient ? `${c.patient.firstName} ${c.patient.lastName}` : 'Unknown',
+          provider: c.provider || c.insuranceProvider || '',
+          amount: c.amount ?? 0,
+          status: c.status || 'Submitted',
+          date: c.date || '',
+        })));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading insurance claims...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Insurance Processing</h1>
+            <p className="text-gray-500 mt-1">Manage insurance claims, verify coverage, and track submissions</p>
+          </div>
+          <Button onClick={() => router.push('/dashboard/insurance/new')}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Claim
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

@@ -1,30 +1,88 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Pill, AlertTriangle, Package, Clock } from 'lucide-react';
+import { Pill, AlertTriangle, Package, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const summaryCards = [
-  { label: 'Total Medications', value: '1,247', icon: Pill, color: 'from-blue-500 to-cyan-500' },
-  { label: 'Low Stock Items', value: '18', icon: AlertTriangle, color: 'from-amber-500 to-orange-500' },
-  { label: 'Dispensed Today', value: '64', icon: Package, color: 'from-emerald-500 to-teal-500' },
-  { label: 'Expiring Soon', value: '9', icon: Clock, color: 'from-red-500 to-rose-500' },
-];
-
-const pharmacyItems = [
-  { id: 'MED-001', medication: 'Lisinopril 10mg', category: 'Cardiovascular', stock: 450, unit: 'tablets', reorder: 100, expiry: '2027-03-15', lowStock: false },
-  { id: 'MED-002', medication: 'Atorvastatin 20mg', category: 'Cardiovascular', stock: 320, unit: 'tablets', reorder: 100, expiry: '2027-01-20', lowStock: false },
-  { id: 'MED-003', medication: 'Metformin 500mg', category: 'Endocrine', stock: 85, unit: 'tablets', reorder: 100, expiry: '2026-12-10', lowStock: true },
-  { id: 'MED-004', medication: 'Amoxicillin 500mg', category: 'Antibiotic', stock: 200, unit: 'capsules', reorder: 75, expiry: '2026-09-05', lowStock: false },
-  { id: 'MED-005', medication: 'Albuterol Inhaler', category: 'Respiratory', stock: 25, unit: 'inhalers', reorder: 30, expiry: '2026-08-22', lowStock: true },
-  { id: 'MED-006', medication: 'Ibuprofen 400mg', category: 'Analgesic', stock: 500, unit: 'tablets', reorder: 150, expiry: '2028-01-01', lowStock: false },
-  { id: 'MED-007', medication: 'Insulin Glargine', category: 'Endocrine', stock: 40, unit: 'vials', reorder: 50, expiry: '2026-07-15', lowStock: true },
-  { id: 'MED-008', medication: 'Omeprazole 20mg', category: 'Gastrointestinal', stock: 180, unit: 'capsules', reorder: 80, expiry: '2027-06-30', lowStock: false },
-];
+import { api, getErrorMessage } from '@/lib/api-client';
+import { getStoredUser } from '@/lib/auth-store';
 
 export default function PharmacyPage() {
+  const [pharmacyItems, setPharmacyItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError('');
+        const data = await api.get<{ medications: any[]; pharmacy?: any[] }>('/api/pharmacy');
+        if (cancelled) return;
+        const items = data.medications || data.pharmacy || [];
+        setPharmacyItems(items.map((m: any) => ({
+          id: m.id,
+          medication: m.medicationName || m.name || '',
+          category: m.category || '',
+          stock: m.stockQuantity ?? m.stock ?? 0,
+          unit: m.unit || 'units',
+          reorder: m.reorderLevel ?? m.reorder ?? 0,
+          expiry: m.expiryDate || m.expiry || '',
+          lowStock: (m.stockQuantity ?? m.stock ?? 0) <= (m.reorderLevel ?? m.reorder ?? 0),
+        })));
+      } catch (err) {
+        if (!cancelled) setError(getErrorMessage(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, []);
+
+  const totalMeds = pharmacyItems.length;
+  const lowStockCount = pharmacyItems.filter(i => i.lowStock).length;
+  const dispensedToday = '--';
+  const expiringSoon = pharmacyItems.filter(i => i.expiry).length;
+
+  const summaryCards = [
+    { label: 'Total Medications', value: totalMeds.toLocaleString(), icon: Pill, color: 'from-blue-500 to-cyan-500' },
+    { label: 'Low Stock Items', value: String(lowStockCount), icon: AlertTriangle, color: 'from-amber-500 to-orange-500' },
+    { label: 'Dispensed Today', value: dispensedToday, icon: Package, color: 'from-emerald-500 to-teal-500' },
+    { label: 'Expiring Soon', value: String(expiringSoon), icon: Clock, color: 'from-red-500 to-rose-500' },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+        <span className="ml-3 text-gray-500">Loading pharmacy data...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Pharmacy & Dispensing</h1>
+          <p className="text-gray-500 mt-1">Medication inventory and dispensing management</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}. Please ensure the database is running.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
