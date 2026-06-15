@@ -35,6 +35,7 @@ const routeAccess: Record<string, Role[]> = {
   '/dashboard/audit-log': ['ADMIN', 'SUPER_ADMIN'],
   '/dashboard/leave-management': ['ADMIN', 'NURSE', 'DOCTOR'],
   '/dashboard/inventory': ['ADMIN', 'NURSE'],
+  '/dashboard/notifications': ['PATIENT', 'DOCTOR', 'NURSE', 'ADMIN', 'BILLING', 'SUPER_ADMIN'],
 };
 
 function getAccessibleRoles(path: string): Role[] | null {

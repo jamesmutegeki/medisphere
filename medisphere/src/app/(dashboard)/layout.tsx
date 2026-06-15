@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -70,14 +70,16 @@ const navigation: NavItem[] = [
   { label: 'Audit Log', href: '/dashboard/audit-log', icon: Shield, roles: ['ADMIN', 'SUPER_ADMIN'] },
   { label: 'Leave Mgmt', href: '/dashboard/leave-management', icon: CalendarDays, roles: ['ADMIN', 'NURSE', 'DOCTOR'] },
   { label: 'Inventory', href: '/dashboard/inventory', icon: Warehouse, roles: ['ADMIN', 'NURSE'] },
+  { label: 'Notifications', href: '/dashboard/notifications', icon: Bell, roles: ['PATIENT', 'DOCTOR', 'NURSE', 'ADMIN', 'BILLING'] },
 ];
 
-const notifications = [
-  { title: 'New lab results available', desc: 'Patient Emily Johnson', time: '5m ago', unread: true },
-  { title: 'Appointment reminder', desc: 'Michael Brown at 11:00 AM', time: '1h ago', unread: true },
-  { title: 'Prescription refill request', desc: 'Sarah Wilson - Metformin', time: '2h ago', unread: false },
-  { title: 'Staff shift change', desc: 'Nurse Amy Chen swapped with Robert Taylor', time: '3h ago', unread: false },
-];
+interface DropdownNotification {
+  id: string;
+  title: string;
+  description: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -85,6 +87,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [dropdownNotifications, setDropdownNotifications] = useState<DropdownNotification[]>([]);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -96,7 +99,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
     setUser(stored);
     setLoading(false);
+    fetchNotifications();
   }, [router]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch('/api/notifications');
+      if (res.ok) {
+        const data = await res.json();
+        setDropdownNotifications(data.notifications.slice(0, 5));
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
+  const formatTime = (dateStr: string) => {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  const unreadCount = dropdownNotifications.filter((n) => !n.isRead).length;
 
   const handleLogout = async () => {
     try {
@@ -297,7 +325,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white font-bold flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
               {notificationsOpen && (
                 <>
@@ -307,24 +339,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <p className="text-sm font-semibold text-gray-900">Notifications</p>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
-                      {notifications.map((n, i) => (
-                        <div
-                          key={i}
-                          className={`flex items-start gap-3 p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${n.unread ? 'bg-blue-50/30' : ''}`}
-                        >
-                          <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${n.unread ? 'bg-blue-500' : 'bg-gray-300'}`} />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                            <p className="text-xs text-gray-500">{n.desc}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{n.time}</p>
-                          </div>
+                      {dropdownNotifications.length === 0 ? (
+                        <div className="p-6 text-center text-sm text-gray-400">
+                          No notifications yet
                         </div>
-                      ))}
+                      ) : (
+                        dropdownNotifications.map((n) => (
+                          <Link
+                            key={n.id}
+                            href={`/dashboard/notifications/${n.id}`}
+                            onClick={() => setNotificationsOpen(false)}
+                            className={`flex items-start gap-3 p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!n.isRead ? 'bg-blue-50/30' : ''}`}
+                          >
+                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!n.isRead ? 'bg-blue-500' : 'bg-gray-300'}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{n.title}</p>
+                              {n.description && <p className="text-xs text-gray-500 truncate">{n.description}</p>}
+                              <p className="text-xs text-gray-400 mt-0.5">{formatTime(n.createdAt)}</p>
+                            </div>
+                          </Link>
+                        ))
+                      )}
                     </div>
                     <div className="p-2 border-t border-gray-100">
-                      <button className="w-full text-center text-sm text-primary-600 hover:text-primary-700 font-medium py-1.5">
+                      <Link
+                        href="/dashboard/notifications"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="block w-full text-center text-sm text-primary-600 hover:text-primary-700 font-medium py-1.5"
+                      >
                         View All Notifications
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </>
