@@ -5,7 +5,7 @@ import { pharmacyItemSchema } from '@/lib/validations';
 
 export async function GET() {
   try {
-    const user = await requireRole(['DOCTOR', 'NURSE', 'ADMIN']);
+    const user = await requireRole(['DOCTOR', 'NURSE', 'ADMIN', 'PATIENT']);
 
     const items = await prisma.pharmacyItem.findMany({
       where: { isActive: true },

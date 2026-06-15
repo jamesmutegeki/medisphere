@@ -1,9 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileText, Search, Plus, Download, Eye, ArrowLeft, User, Calendar, Activity, Loader2, AlertCircle } from 'lucide-react';
+import { FileText, Search, Plus, Download, Eye, ArrowLeft, User, Calendar, Activity, Loader2, AlertCircle, Upload, X } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,10 @@ export default function RecordsPage() {
   const [mockRecords, setMockRecords] = useState<MedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: string; dataUrl: string }[]>([]);
 
   useEffect(() => {
     setUser(getStoredUser());
@@ -72,7 +76,7 @@ export default function RecordsPage() {
           id: r.id || `MR-${idx}`,
           patientId: r.patientId || r.patient?.id || '',
           patient: r.patient ? `${r.patient.firstName} ${r.patient.lastName}` : 'Unknown',
-          date: r.date || '',
+          date: r.date || r.recordDate || '',
           diagnosis: r.diagnosis || '',
           doctor: r.doctor ? `Dr. ${r.doctor.firstName} ${r.doctor.lastName}` : 'Unassigned',
           type: r.type || 'Consultation',
@@ -86,7 +90,7 @@ export default function RecordsPage() {
             patientMap.set(pid, {
               id: pid,
               name: r.patient ? `${r.patient.firstName} ${r.patient.lastName}` : 'Unknown',
-              lastVisit: r.date || '',
+              lastVisit: r.date || r.recordDate || '',
               condition: r.diagnosis || '',
               records: 0,
             });
@@ -117,17 +121,54 @@ export default function RecordsPage() {
   const getRecordsForPatient = (patientId: string) =>
     mockRecords.filter((r) => r.patientId === patientId);
 
-  const getPatientRecords = () => {
-    if (!user) return [];
-    return mockRecords.filter((r) =>
-      r.patient.toLowerCase().includes(user.firstName.toLowerCase()) &&
-      r.patient.toLowerCase().includes(user.lastName.toLowerCase())
-    );
-  };
+  const displayRecords = isPatient ? mockRecords : mockRecords;
 
   const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (const f of Array.from(files)) {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(f);
+      });
+      setUploadedFiles(prev => [...prev, {
+        name: f.name,
+        size: `${(f.size / 1024).toFixed(1)} KB`,
+        dataUrl,
+      }]);
+    }
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handleUpload = async () => {
+    if (uploadedFiles.length === 0) return;
+    setUploading(true);
+    try {
+      for (const f of uploadedFiles) {
+        await api.post('/api/medical-records', {
+          diagnosis: `Uploaded document: ${f.name}`,
+          notes: `Patient-uploaded scan/photo of old medical record`,
+          type: 'Document',
+        });
+      }
+      setUploadedFiles([]);
+      setShowUpload(false);
+    } catch (err) {
+      alert('Upload failed: ' + getErrorMessage(err));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   if (loading) {
@@ -147,10 +188,12 @@ export default function RecordsPage() {
             <h1 className="text-2xl font-bold text-gray-900">Medical Records</h1>
             <p className="text-gray-500 mt-1">Access and manage patient electronic health records</p>
           </div>
-          <Button onClick={() => router.push('/dashboard/records/new')}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Record
-          </Button>
+          {!isPatient && (
+            <Button onClick={() => router.push('/dashboard/records/new')}>
+              <Plus className="w-4 h-4 mr-2" />
+              New Record
+            </Button>
+          )}
         </div>
         <Card>
           <CardContent className="p-6">
@@ -337,8 +380,7 @@ export default function RecordsPage() {
     );
   }
 
-  const displayRecords = isPatient ? getPatientRecords() : mockRecords;
-
+  // Patient view with upload capability
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -346,10 +388,18 @@ export default function RecordsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Medical Records</h1>
           <p className="text-gray-500 mt-1">Access and manage patient electronic health records</p>
         </div>
-        <Button onClick={() => router.push('/dashboard/records/new')}>
-          <Plus className="w-4 h-4 mr-2" />
-          New Record
-        </Button>
+        <div className="flex items-center gap-2">
+          {isPatient && (
+            <Button onClick={() => setShowUpload(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Old Records
+            </Button>
+          )}
+          <Button onClick={() => router.push('/dashboard/records/new')}>
+            <Plus className="w-4 h-4 mr-2" />
+            New Record
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -416,6 +466,84 @@ export default function RecordsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Upload Modal */}
+      <AnimatePresence>
+        {showUpload && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => !uploading && setShowUpload(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-900">Upload Old Medical Records</h2>
+                <button onClick={() => !uploading && setShowUpload(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                Upload scanned copies or photos of your old medical records. These will be added to your file for doctor review.
+              </p>
+
+              <div
+                onClick={() => fileRef.current?.click()}
+                className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-primary-300 cursor-pointer transition-colors"
+              >
+                <Upload className="w-10 h-10 mx-auto text-gray-300 mb-3" />
+                <p className="text-sm font-medium text-gray-700">Click to select files</p>
+                <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG accepted</p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              </div>
+
+              {uploadedFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {uploadedFiles.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-700 truncate">{f.name}</span>
+                        <span className="text-xs text-gray-400">({f.size})</span>
+                      </div>
+                      <button onClick={() => removeFile(i)} className="text-gray-400 hover:text-red-500 p-1">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <Button variant="outline" className="flex-1" onClick={() => { setShowUpload(false); setUploadedFiles([]); }} disabled={uploading}>
+                  Cancel
+                </Button>
+                <Button className="flex-1" onClick={handleUpload} disabled={uploadedFiles.length === 0 || uploading}>
+                  {uploading ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</>
+                  ) : (
+                    <><Upload className="w-4 h-4 mr-2" /> Upload {uploadedFiles.length > 0 ? `(${uploadedFiles.length})` : ''}</>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

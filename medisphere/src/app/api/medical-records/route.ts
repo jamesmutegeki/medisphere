@@ -29,7 +29,7 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json(records);
+    return NextResponse.json({ records });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

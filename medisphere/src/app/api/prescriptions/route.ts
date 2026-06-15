@@ -28,7 +28,7 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json(prescriptions);
+    return NextResponse.json({ prescriptions });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

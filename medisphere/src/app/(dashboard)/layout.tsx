@@ -53,7 +53,7 @@ const navigation: NavItem[] = [
   { label: 'Ward Management', href: '/dashboard/wards', icon: Building2, roles: ['ADMIN', 'NURSE'] },
   { label: 'Staff Rota', href: '/dashboard/staff', icon: Users, roles: ['ADMIN'] },
   { label: 'Billing', href: '/dashboard/billing', icon: Receipt, roles: ['BILLING', 'PATIENT'] },
-  { label: 'Insurance', href: '/dashboard/insurance', icon: Shield, roles: ['BILLING', 'PATIENT'] },
+  { label: 'Insurance', href: '/dashboard/insurance', icon: Shield, roles: ['BILLING'] },
   { label: 'Patient Portal', href: '/dashboard/portal', icon: UserCircle, roles: ['PATIENT'] },
   // Clinical
   { label: 'Lab Results', href: '/dashboard/laboratory', icon: FlaskConical, roles: ['DOCTOR', 'NURSE', 'PATIENT'] },

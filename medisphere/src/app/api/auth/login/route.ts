@@ -37,6 +37,8 @@ export async function POST(request: Request) {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        nin: user.nin,
+        avatarUrl: user.avatarUrl,
       },
     });
   } catch (error) {

@@ -7,6 +7,7 @@ export interface AuthUser {
   lastName: string;
   role: 'PATIENT' | 'DOCTOR' | 'NURSE' | 'ADMIN' | 'BILLING' | 'SUPER_ADMIN';
   avatarUrl?: string;
+  nin?: string;
 }
 
 const STORAGE_KEY = 'medisphere_user';

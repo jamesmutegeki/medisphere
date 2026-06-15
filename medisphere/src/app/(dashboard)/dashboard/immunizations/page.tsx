@@ -10,11 +10,16 @@ import { api, getErrorMessage } from '@/lib/api-client';
 import { getStoredUser } from '@/lib/auth-store';
 
 export default function ImmunizationsPage() {
+  const [user, setUser] = useState(getStoredUser());
   const [patients, setPatients] = useState<{ id: string; name: string }[]>([]);
   const [immunizationRecords, setImmunizationRecords] = useState<Record<string, any[]>>({});
   const [selectedPatient, setSelectedPatient] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,11 +39,13 @@ export default function ImmunizationsPage() {
           if (!recordsMap[pid]) recordsMap[pid] = [];
           recordsMap[pid].push({
             id: r.id,
-            vaccine: r.vaccine || r.vaccineName || '',
-            dose: r.dose || r.doseNumber || '',
-            date: r.date || '',
+            vaccine: r.vaccineName || r.vaccine || '',
+            dose: r.doseNumber ? `Dose ${r.doseNumber}` : r.dose || '',
+            date: r.administrationDate || r.date || '',
             nextDose: r.nextDoseDate || r.nextDose || 'Completed',
-            administeredBy: r.administeredBy || r.administeredBy || '',
+            administeredBy: r.provider
+              ? `${r.provider.firstName} ${r.provider.lastName}`
+              : r.administeredBy || '',
           });
         });
         if (!cancelled) {
@@ -57,7 +64,10 @@ export default function ImmunizationsPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const records = immunizationRecords[selectedPatient] || [];
+  const isPatient = user?.role === 'PATIENT';
+  const records = isPatient
+    ? (immunizationRecords[user?.id || ''] || [])
+    : (immunizationRecords[selectedPatient] || []);
   const completedCount = records.filter((r: any) => r.nextDose === 'Completed').length;
   const upcomingCount = records.filter((r: any) => r.nextDose !== 'Completed').length;
 
@@ -107,15 +117,17 @@ export default function ImmunizationsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Immunization History</CardTitle>
-                <select
-                  value={selectedPatient}
-                  onChange={(e) => setSelectedPatient(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
+                {!isPatient && (
+                  <select
+                    value={selectedPatient}
+                    onChange={(e) => setSelectedPatient(e.target.value)}
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    {patients.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -124,11 +136,10 @@ export default function ImmunizationsPage() {
                   <thead>
                     <tr className="border-b border-gray-100">
                       <th className="text-left py-3 px-4 text-gray-500 font-medium">Vaccine</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium">Dose #</th>
+                      <th className="text-left py-3 px-4 text-gray-500 font-medium">Dose</th>
                       <th className="text-left py-3 px-4 text-gray-500 font-medium">Date Administered</th>
                       <th className="text-left py-3 px-4 text-gray-500 font-medium">Next Dose</th>
                       <th className="text-left py-3 px-4 text-gray-500 font-medium">Administered By</th>
-                      <th className="text-left py-3 px-4 text-gray-500 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -142,19 +153,16 @@ export default function ImmunizationsPage() {
                       >
                         <td className="py-3 px-4 font-medium text-gray-900">{record.vaccine}</td>
                         <td className="py-3 px-4 text-gray-700">{record.dose}</td>
-                        <td className="py-3 px-4 text-gray-500">{record.date}</td>
+                        <td className="py-3 px-4 text-gray-500">{new Date(record.date).toLocaleDateString()}</td>
                         <td className="py-3 px-4">
                           <span className={cn(
                             'text-xs font-medium',
                             record.nextDose === 'Completed' ? 'text-green-600' : 'text-amber-600'
                           )}>
-                            {record.nextDose}
+                            {record.nextDose === 'Completed' ? 'Completed' : new Date(record.nextDose).toLocaleDateString()}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-gray-500">{record.administeredBy}</td>
-                        <td className="py-3 px-4">
-                          <Button variant="ghost" size="sm">View</Button>
-                        </td>
                       </motion.tr>
                     ))}
                   </tbody>

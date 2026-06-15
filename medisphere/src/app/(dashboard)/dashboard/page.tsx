@@ -14,20 +14,24 @@ import {
   Pill,
   FileText,
   Stethoscope,
+  User,
+  Loader2,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { getStoredUser } from '@/lib/auth-store';
 import type { AuthUser } from '@/lib/auth-store';
+import { api, getErrorMessage } from '@/lib/api-client';
 
 type Role = 'PATIENT' | 'DOCTOR' | 'NURSE' | 'ADMIN' | 'BILLING';
 
 const statsConfig: Record<Role, { label: string; value: string; icon: any; change: string; color: string }[]> = {
   PATIENT: [
-    { label: 'Upcoming Appointments', value: '2', icon: Calendar, change: 'Next: Tomorrow 10AM', color: 'from-blue-500 to-cyan-500' },
-    { label: 'Pending Prescriptions', value: '1', icon: Pill, change: 'Ready for pickup', color: 'from-emerald-500 to-teal-500' },
-    { label: 'Medical Records', value: '12', icon: FileText, change: 'Last updated 2 days ago', color: 'from-violet-500 to-purple-500' },
-    { label: 'Outstanding Bills', value: '$150', icon: TrendingUp, change: 'Due in 5 days', color: 'from-amber-500 to-orange-500' },
+    { label: 'Upcoming Appointments', value: '-', icon: Calendar, change: 'Loading...', color: 'from-blue-500 to-cyan-500' },
+    { label: 'Active Prescriptions', value: '-', icon: Pill, change: 'Loading...', color: 'from-emerald-500 to-teal-500' },
+    { label: 'Medical Records', value: '-', icon: FileText, change: 'Loading...', color: 'from-violet-500 to-purple-500' },
+    { label: 'Outstanding Bills', value: '-', icon: TrendingUp, change: 'Loading...', color: 'from-amber-500 to-orange-500' },
   ],
   DOCTOR: [
     { label: 'Today\'s Patients', value: '8', icon: Users, change: '3 more scheduled', color: 'from-blue-500 to-cyan-500' },
@@ -70,6 +74,11 @@ const alerts = [
 
 export default function DashboardPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [prescriptionsCount, setPrescriptionsCount] = useState(0);
+  const [recordsCount, setRecordsCount] = useState(0);
+  const [billsTotal, setBillsTotal] = useState(0);
+  const [statsLoading, setStatsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -79,19 +88,63 @@ export default function DashboardPage() {
       return;
     }
     setUser(stored);
+
+    if (stored.role === 'PATIENT') {
+      fetchPatientStats();
+    } else {
+      setStatsLoading(false);
+    }
   }, [router]);
+
+  const fetchPatientStats = async () => {
+    try {
+      const [apptData, rxData, recordsData, billsData] = await Promise.all([
+        api.get<{ appointments: any[] }>('/api/appointments').catch(() => ({ appointments: [] })),
+        api.get<{ prescriptions: any[] }>('/api/prescriptions').catch(() => ({ prescriptions: [] })),
+        api.get<{ records: any[] }>('/api/medical-records').catch(() => ({ records: [] })),
+        api.get<{ invoices: any[] }>('/api/invoices').catch(() => ({ invoices: [] })),
+      ]);
+      const today = new Date().toISOString().split('T')[0];
+      const upcoming = (apptData.appointments || []).filter(
+        (a: any) => new Date(a.date || a.startTime) >= new Date()
+      );
+      setAppointments(upcoming.slice(0, 5));
+      const rx = rxData.prescriptions || [];
+      setPrescriptionsCount(rx.filter((p: any) => p.isActive).length);
+      setRecordsCount((recordsData.records || []).length);
+      const invs = billsData.invoices || [];
+      setBillsTotal(invs
+        .filter((i: any) => i.status === 'PENDING' || i.status === 'Overdue')
+        .reduce((s: number, i: any) => s + Number(i.totalAmount ?? i.amount ?? 0) - Number(i.paidAmount ?? i.paid ?? 0), 0)
+      );
+    } catch {
+      // silently fail
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   if (!user) return null;
 
   const role = user.role as Role;
-  const stats = statsConfig[role];
+  const isPatient = role === 'PATIENT';
+
+  // Override patient stats with real data
+  const stats = isPatient && !statsLoading
+    ? [
+        { label: 'Upcoming Appointments', value: String(appointments.length), icon: Calendar, change: appointments.length > 0 ? 'Next appointment scheduled' : 'No upcoming visits', color: 'from-blue-500 to-cyan-500' },
+        { label: 'Active Prescriptions', value: String(prescriptionsCount), icon: Pill, change: prescriptionsCount > 0 ? `${prescriptionsCount} active medications` : 'No active prescriptions', color: 'from-emerald-500 to-teal-500' },
+        { label: 'Medical Records', value: String(recordsCount), icon: FileText, change: `${recordsCount} records on file`, color: 'from-violet-500 to-purple-500' },
+        { label: 'Outstanding Bills', value: `$${billsTotal}`, icon: TrendingUp, change: billsTotal > 0 ? 'Payment due' : 'All paid', color: 'from-amber-500 to-orange-500' },
+      ]
+    : statsConfig[role];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          Good morning, {user.firstName}
+          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {user.firstName}
         </h1>
         <p className="text-gray-500 mt-1">
           Here&apos;s your overview for today
@@ -132,48 +185,111 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Today's Schedule */}
+        {/* Today's Schedule / Queue */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Today&apos;s Schedule</CardTitle>
+              <CardTitle>{isPatient ? 'My Queue & Appointments' : 'Today\'s Schedule'}</CardTitle>
               <Link href="/dashboard/appointments" className="text-sm text-primary-600 font-medium hover:underline">
                 View All
               </Link>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentPatients.map((patient, index) => (
-                  <motion.div
-                    key={patient.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center text-primary-700 font-semibold text-sm">
-                        {patient.name.split(' ').map(n => n[0]).join('')}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{patient.name}</p>
-                        <p className="text-xs text-gray-500">{patient.id} &middot; {patient.condition}</p>
-                      </div>
+              {isPatient ? (
+                <div className="space-y-3">
+                  {appointments.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <Calendar className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No upcoming appointments</p>
+                      <Link href="/dashboard/appointments/new" className="text-sm text-primary-600 font-medium hover:underline mt-2 inline-block">
+                        Book an appointment
+                      </Link>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-gray-500">{patient.time}</span>
-                      <span className={cn(
-                        'px-2 py-1 text-xs font-medium rounded-full',
-                        patient.status === 'In Progress' && 'bg-blue-50 text-blue-700',
-                        patient.status === 'Waiting' && 'bg-amber-50 text-amber-700',
-                        patient.status === 'Scheduled' && 'bg-gray-50 text-gray-600',
-                      )}>
-                        {patient.status}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                  ) : (
+                    appointments.map((apt, index) => {
+                      const statusColors: Record<string, string> = {
+                        SCHEDULED: 'bg-gray-50 text-gray-600',
+                        CONFIRMED: 'bg-blue-50 text-blue-700',
+                        IN_PROGRESS: 'bg-amber-50 text-amber-700',
+                        COMPLETED: 'bg-green-50 text-green-700',
+                        CANCELLED: 'bg-red-50 text-red-700',
+                      };
+                      const position = index + 1;
+                      return (
+                        <motion.div
+                          key={apt.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center text-primary-700 font-semibold text-sm">
+                              {position}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {apt.type || 'Appointment'} {apt.status === 'IN_PROGRESS' && '(You\'re up!)'}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {apt.doctor ? `Dr. ${apt.doctor.firstName} ${apt.doctor.lastName}` : 'Doctor'} &middot;{' '}
+                                {new Date(apt.startTime || apt.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {apt.status === 'IN_PROGRESS' && (
+                              <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+                                <Clock className="w-3 h-3" />
+                                Queue position: #{position}
+                              </span>
+                            )}
+                            <span className={cn(
+                              'px-2 py-1 text-xs font-medium rounded-full',
+                              statusColors[apt.status] || 'bg-gray-50 text-gray-600'
+                            )}>
+                              {apt.status === 'IN_PROGRESS' ? 'In Progress' : apt.status}
+                            </span>
+                          </div>
+                        </motion.div>
+                      );
+                    })
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentPatients.map((patient, index) => (
+                    <motion.div
+                      key={patient.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center text-primary-700 font-semibold text-sm">
+                          {patient.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{patient.name}</p>
+                          <p className="text-xs text-gray-500">{patient.id} &middot; {patient.condition}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-500">{patient.time}</span>
+                        <span className={cn(
+                          'px-2 py-1 text-xs font-medium rounded-full',
+                          patient.status === 'In Progress' && 'bg-blue-50 text-blue-700',
+                          patient.status === 'Waiting' && 'bg-amber-50 text-amber-700',
+                          patient.status === 'Scheduled' && 'bg-gray-50 text-gray-600',
+                        )}>
+                          {patient.status}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
