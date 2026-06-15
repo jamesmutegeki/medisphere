@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, requireRole, logAudit } from '@/lib/auth';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireAuth();
+    const { id } = await params;
 
     const invoice = await prisma.invoice.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         patient: { select: { id: true, firstName: true, lastName: true } },
         billingOfficer: { select: { id: true, firstName: true, lastName: true } },
@@ -31,18 +35,22 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['BILLING']);
     const body = await request.json();
+    const { id } = await params;
 
-    const existing = await prisma.invoice.findUnique({ where: { id: params.id } });
+    const existing = await prisma.invoice.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
     const invoice = await prisma.invoice.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: body.status,
         paidAmount: body.paidAmount !== undefined ? body.paidAmount : undefined,
@@ -64,17 +72,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['BILLING', 'ADMIN']);
+    const { id } = await params;
 
-    const existing = await prisma.invoice.findUnique({ where: { id: params.id } });
+    const existing = await prisma.invoice.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
     }
 
     const invoice = await prisma.invoice.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: 'CANCELLED' },
     });
 

@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, logAudit } from '@/lib/auth';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['PATIENT', 'DOCTOR', 'NURSE', 'ADMIN']);
+    const { id } = await params;
 
     const result = await prisma.labResult.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         patient: { select: { id: true, firstName: true, lastName: true } },
         doctor: { select: { id: true, firstName: true, lastName: true } },
@@ -34,11 +38,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['DOCTOR', 'NURSE']);
+    const { id } = await params;
 
-    const existing = await prisma.labResult.findUnique({ where: { id: params.id } });
+    const existing = await prisma.labResult.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -57,7 +65,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     const updated = await prisma.labResult.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
 
@@ -75,18 +83,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['DOCTOR', 'ADMIN']);
+    const { id } = await params;
 
-    const existing = await prisma.labResult.findUnique({ where: { id: params.id } });
+    const existing = await prisma.labResult.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    await prisma.labResult.delete({ where: { id: params.id } });
+    await prisma.labResult.delete({ where: { id } });
 
-    await logAudit(user.id, 'DELETE', 'lab_result', params.id, 'Lab result deleted');
+    await logAudit(user.id, 'DELETE', 'lab_result', id, 'Lab result deleted');
 
     return NextResponse.json({ message: 'Deleted successfully' });
   } catch (error: any) {

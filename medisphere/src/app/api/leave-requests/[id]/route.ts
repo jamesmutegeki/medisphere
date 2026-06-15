@@ -4,13 +4,14 @@ import { requireAuth, requireRole, logAudit } from '@/lib/auth';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth();
+    const { id } = await params;
 
     const leaveRequest = await prisma.leaveRequest.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         user: { select: { id: true, firstName: true, lastName: true } },
         approver: { select: { id: true, firstName: true, lastName: true } },
@@ -32,14 +33,15 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireRole(['ADMIN']);
     const body = await request.json();
+    const { id } = await params;
 
     const leaveRequest = await prisma.leaveRequest.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: body.status,
         approvedBy: user.id,

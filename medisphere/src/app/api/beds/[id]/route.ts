@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, requireRole, logAudit } from '@/lib/auth';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireAuth();
+    const { id } = await params;
 
     const bed = await prisma.bed.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         ward: { select: { id: true, name: true, type: true, floor: true, wing: true } },
         patient: { select: { id: true, firstName: true, lastName: true } },
@@ -27,12 +31,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['ADMIN', 'NURSE']);
     const body = await request.json();
+    const { id } = await params;
 
-    const existing = await prisma.bed.findUnique({ where: { id: params.id } });
+    const existing = await prisma.bed.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Bed not found' }, { status: 404 });
     }
@@ -50,7 +58,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     const bed = await prisma.bed.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
 

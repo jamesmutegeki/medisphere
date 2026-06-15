@@ -4,11 +4,11 @@ import { requireAuth, logAudit } from '@/lib/auth';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth();
-    const { id } = params;
+    const { id } = await params;
 
     const appointment = await prisma.appointment.findUnique({
       where: { id },
@@ -37,7 +37,7 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth();
@@ -46,7 +46,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     const appointment = await prisma.appointment.findUnique({

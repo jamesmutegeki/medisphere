@@ -4,11 +4,11 @@ import { requireAuth, requireRole, logAudit } from '@/lib/auth';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await requireAuth();
-    const { id } = params;
+    const { id } = await params;
 
     if (currentUser.role !== 'ADMIN' && currentUser.id !== id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -38,11 +38,11 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await requireRole(['ADMIN']);
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
 
     const data: any = {};
@@ -73,11 +73,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const currentUser = await requireRole(['ADMIN']);
-    const { id } = params;
+    const { id } = await params;
 
     await prisma.user.update({
       where: { id },

@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, requireRole, logAudit } from '@/lib/auth';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireAuth();
+    const { id } = await params;
 
     const claim = await prisma.insuranceClaim.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         patient: { select: { id: true, firstName: true, lastName: true } },
         processor: { select: { id: true, firstName: true, lastName: true } },
@@ -31,12 +35,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['BILLING']);
     const body = await request.json();
+    const { id } = await params;
 
-    const existing = await prisma.insuranceClaim.findUnique({ where: { id: params.id } });
+    const existing = await prisma.insuranceClaim.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
     }
@@ -53,7 +61,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     const claim = await prisma.insuranceClaim.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
 
@@ -71,18 +79,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['BILLING', 'ADMIN']);
+    const { id } = await params;
 
-    const existing = await prisma.insuranceClaim.findUnique({ where: { id: params.id } });
+    const existing = await prisma.insuranceClaim.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Claim not found' }, { status: 404 });
     }
 
-    await prisma.insuranceClaim.delete({ where: { id: params.id } });
+    await prisma.insuranceClaim.delete({ where: { id } });
 
-    await logAudit(user.id, 'DELETE', 'insurance_claim', params.id, 'Insurance claim deleted');
+    await logAudit(user.id, 'DELETE', 'insurance_claim', id, 'Insurance claim deleted');
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

@@ -2,12 +2,16 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, logAudit } from '@/lib/auth';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['DOCTOR', 'ADMIN']);
+    const { id } = await params;
 
     const referral = await prisma.referral.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         patient: { select: { id: true, firstName: true, lastName: true } },
         referringDoctor: { select: { id: true, firstName: true, lastName: true } },
@@ -37,11 +41,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = await requireRole(['DOCTOR']);
+    const { id } = await params;
 
-    const referral = await prisma.referral.findUnique({ where: { id: params.id } });
+    const referral = await prisma.referral.findUnique({ where: { id } });
     if (!referral) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -58,7 +66,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     const updated = await prisma.referral.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status,
         responseDate: new Date(),
