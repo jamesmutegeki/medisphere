@@ -13,6 +13,10 @@ import {
   CheckCircle2,
   Menu,
   X,
+  Hospital,
+  Ambulance,
+  Award,
+  HeartPulse,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -52,10 +56,10 @@ const features = [
 ];
 
 const stats = [
-  { value: '99.9%', label: 'Uptime' },
-  { value: '<1.5s', label: 'Page Load' },
-  { value: '500+', label: 'Concurrent Users' },
-  { value: 'AES-256', label: 'Encryption' },
+  { value: '10K+', label: 'Patients Served', icon: Hospital, color: 'from-blue-500 to-cyan-500' },
+  { value: '500+', label: 'Healthcare Staff', icon: Users, color: 'from-emerald-500 to-teal-500' },
+  { value: '50K+', label: 'Appointments', icon: Calendar, color: 'from-violet-500 to-purple-500' },
+  { value: '99.9%', label: 'Uptime SLA', icon: Award, color: 'from-amber-500 to-orange-500' },
 ];
 
 const roles = [
@@ -183,14 +187,24 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto"
+            className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto"
           >
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center p-4">
-                <div className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</div>
-                <div className="text-sm text-gray-500 mt-1">{stat.label}</div>
-              </div>
-            ))}
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="relative group p-5 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300"
+                >
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-br opacity-0 group-hover:opacity-5 transition-opacity duration-300 -z-10" />
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3 shadow-sm`}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                  <div className="text-sm text-gray-500 mt-0.5">{stat.label}</div>
+                </div>
+              );
+            })}
           </motion.div>
         </div>
       </section>

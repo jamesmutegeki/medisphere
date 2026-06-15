@@ -70,8 +70,10 @@ model User {
   dateOfBirth    DateTime?
   address        String?
   isActive       Boolean   @default(true)
-  emailVerified  DateTime?
-  createdAt      DateTime  @default(now())
+  emailVerified    DateTime?
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
+  createdAt        DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   patientProfile      PatientProfile?

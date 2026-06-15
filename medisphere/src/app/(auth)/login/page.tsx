@@ -29,7 +29,7 @@ export default function LoginPage() {
     const result = loginSchema.safeParse(formData);
     if (!result.success) {
       const errors: Record<string, string> = {};
-      result.error.errors.forEach((err) => {
+      result.error.issues.forEach((err) => {
         errors[err.path[0] as string] = err.message;
       });
       setFieldErrors(errors);
@@ -117,9 +117,9 @@ export default function LoginPage() {
               <input type="checkbox" className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
               <span className="text-gray-600">Remember me</span>
             </label>
-            <span className="text-gray-400 cursor-default text-sm">
+            <Link href="/forgot-password" className="text-primary-600 hover:text-primary-700 font-medium text-sm">
               Forgot password?
-            </span>
+            </Link>
           </div>
 
           <Button type="submit" isLoading={isLoading} className="w-full">
@@ -135,19 +135,6 @@ export default function LoginPage() {
               Create one
             </Link>
           </p>
-
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500">
-            <p className="font-medium text-gray-700 mb-2">Demo Accounts (password123):</p>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-              <p><span className="text-blue-600 font-medium">Admin</span> — admin@medisphere.com</p>
-              <p><span className="text-emerald-600 font-medium">Doctor</span> — sarah.chen@medisphere.com</p>
-              <p><span className="text-purple-600 font-medium">Nurse</span> — amy.chen@medisphere.com</p>
-              <p><span className="text-amber-600 font-medium">Billing</span> — billing@medisphere.com</p>
-              <p><span className="text-gray-600 font-medium">Patient</span> — john.smith@email.com</p>
-              <p><span className="text-gray-600 font-medium">Patient</span> — emily.j@email.com</p>
-              <p><span className="text-gray-600 font-medium">Patient</span> — michael.b@email.com</p>
-            </div>
-          </div>
         </div>
       </div>
     </motion.div>
