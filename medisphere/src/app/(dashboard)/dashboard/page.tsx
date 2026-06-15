@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Calendar,
@@ -136,9 +137,9 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Today&apos;s Schedule</CardTitle>
-              <span className="text-sm text-primary-600 font-medium cursor-pointer hover:underline">
+              <Link href="/dashboard/appointments" className="text-sm text-primary-600 font-medium hover:underline">
                 View All
-              </span>
+              </Link>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { FlaskConical, Search, Activity, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ export default function LaboratoryPage() {
         setLabResults(items.map((r: any) => ({
           id: r.id,
           patient: r.patient ? `${r.patient.firstName} ${r.patient.lastName}` : 'Unknown',
+          patientId: r.patient?.id || '',
           test: r.testName || r.test || '',
           category: r.category || '',
           result: r.result || '',
@@ -162,7 +164,15 @@ export default function LaboratoryPage() {
                     transition={{ delay: index * 0.03 }}
                     className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="py-3 px-4 font-medium text-gray-900">{result.patient}</td>
+                    <td className="py-3 px-4">
+                      {result.patientId ? (
+                        <Link href={`/dashboard/patients/${result.patientId}`} className="font-medium text-gray-900 hover:text-primary-600 hover:underline">
+                          {result.patient}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-gray-900">{result.patient}</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-gray-700">{result.test}</td>
                     <td className="py-3 px-4 text-gray-500">{result.category}</td>
                     <td className="py-3 px-4 text-gray-700">{result.result}</td>

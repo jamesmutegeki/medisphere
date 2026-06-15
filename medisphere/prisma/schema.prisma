@@ -66,6 +66,7 @@ model User {
   lastName       String
   role           Role      @default(PATIENT)
   phone          String?
+  nin            String?
   avatarUrl      String?
   dateOfBirth    DateTime?
   address        String?

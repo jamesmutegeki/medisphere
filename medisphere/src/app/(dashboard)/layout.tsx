@@ -68,7 +68,7 @@ const navigation: NavItem[] = [
   { label: 'Revenue', href: '/dashboard/revenue', icon: TrendingUp, roles: ['ADMIN', 'BILLING'] },
   { label: 'Doctor Profiles', href: '/dashboard/doctor-profiles', icon: Upload, roles: ['ADMIN'] },
   { label: 'Audit Log', href: '/dashboard/audit-log', icon: Shield, roles: ['ADMIN', 'SUPER_ADMIN'] },
-  { label: 'Leave Mgmt', href: '/dashboard/leave-management', icon: CalendarDays, roles: ['ADMIN', 'NURSE', 'DOCTOR'] },
+  { label: 'Leave Mgmt', href: '/dashboard/leave-management', icon: CalendarDays, roles: ['ADMIN', 'NURSE'] },
   { label: 'Inventory', href: '/dashboard/inventory', icon: Warehouse, roles: ['ADMIN', 'NURSE'] },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell, roles: ['PATIENT', 'DOCTOR', 'NURSE', 'ADMIN', 'BILLING'] },
 ];

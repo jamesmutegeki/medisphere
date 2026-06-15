@@ -59,6 +59,11 @@ export async function PATCH(
 
     const data: any = {};
     if (body.status) data.status = body.status;
+    if (body.date) data.date = new Date(body.date);
+    if (body.startTime) data.startTime = new Date(body.startTime);
+    if (body.endTime) data.endTime = body.endTime ? new Date(body.endTime) : undefined;
+    if (body.type) data.type = body.type;
+    if (body.notes !== undefined) data.notes = body.notes;
 
     if (body.status === 'CANCELLED') {
       if (!body.cancellationReason) {
