@@ -390,14 +390,6 @@ async function main() {
   console.log('Created 10 audit logs');
 
   // ── Demo login users ──────────────────────────────────────
-  console.log('\n--- Demo Accounts ---');
-  console.log('Admin:   admin@medisphere.com / password123');
-  console.log('Billing: billing@medisphere.com / password123');
-  console.log('Doctor:  sarah.chen@medisphere.com / password123');
-  console.log('Nurse:   amy.chen@medisphere.com / password123');
-  console.log('Patient: john.smith@email.com / password123');
-  console.log('Patient: emily.j@email.com / password123');
-  console.log('--- All users use password123 ---\n');
 
   console.log('✅ Seed complete!');
 }
